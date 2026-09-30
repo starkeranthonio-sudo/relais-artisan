@@ -53,6 +53,23 @@ select vault.create_secret('https://<ref>.supabase.co', 'project_url');
 select vault.create_secret('<même valeur que CRON_SECRET>', 'cron_secret');
 ```
 
+## Étape 4 : espace artisan ✅
+
+Application web mobile (`web/`, routes `/app/...`), thème anthracite + orange :
+- **Inscription / Connexion** (Supabase Auth, email + mot de passe). La fiche `artisans` est créée par un trigger à l'inscription.
+- **Demandes** : liste avec statut (SMS envoyé, À rappeler, Contacté, Devis envoyé, Terminé), badge Urgent, résumé IA. Fiche détaillée : Appeler, SMS, adresse sur Maps, photos, « J'ai envoyé un devis ».
+- **Devis** : En attente / Gagnés / Perdus, suivi des relances, boutons Gagné / Perdu (le montant est demandé au moment du « Gagné » s'il manque).
+- **Bilan du mois** : montant signé, appels manqués, clients recontactés, demandes, devis, taux de signature.
+- **Réglages / Installation** : numéro relais, code de renvoi `**61*<relais>**20#` (bouton Android, copie), essai, profil.
+- **Mode démo** sans compte, avec des données fictives : `/demo` (pour les rendez-vous commerciaux).
+
+Sécurité vérifiée sur la base : un artisan ne voit que ses données, ne peut ni changer son numéro relais ni modifier le planning des relances, et ne peut pas créer de devis sur la demande d'un autre.
+
+Attribution d'un numéro relais (manuelle en V1) :
+```sql
+update artisans set relay_number = '+33939xxxxxx' where id = '<id>';
+```
+
 ## Mise en route
 
 ### 1. Supabase
@@ -89,4 +106,6 @@ Appeler le numéro Twilio depuis son téléphone. On doit entendre le message, p
 - À vérifier sur les 4 opérateurs : le numéro du client est-il bien transmis après un renvoi `**61*` ?
 
 ## Prochaines étapes
-4. Écrans artisan + bilan du mois
+- Déployer la page web (Cloudflare Pages) et le domaine
+- Supabase Auth : ajouter l'URL du site dans *Authentication → URL Configuration* (liens de confirmation d'email)
+- Paiement de l'abonnement (Stripe) et attribution automatique des numéros relais

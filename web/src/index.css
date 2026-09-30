@@ -180,3 +180,6 @@ input[type="text"]:focus, textarea:focus {
 }
 
 .footer { text-align: center; color: var(--text-dim); font-size: 0.8125rem; padding: 20px 8px 28px; }
+
+.home-cta { display: block; text-decoration: none; text-align: center; margin-top: 16px; width: 100%; max-width: 360px; }
+.home-link { color: var(--text-sec); font-weight: 600; }
