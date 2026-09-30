@@ -39,6 +39,20 @@ Règles de fonctionnement :
 
 Démo sans backend : `cd web && npm run dev`, puis ouvrir `http://localhost:5173/d/demo`.
 
+## Étape 3 : relance automatique des devis ✅
+
+1. L'artisan déclare « J'ai envoyé un devis » : insertion dans `quotes` (bouton de l'écran Devis à l'étape 4). La première relance est planifiée à J+3.
+2. `pg_cron` appelle l'Edge Function `quote-followups` toutes les 15 minutes, avec un secret partagé.
+3. Relances à **J+3, J+7 et J+14**, depuis le numéro relais, du lundi au samedi entre 9 h et 19 h (heure de Paris). Chaque texte tient en un SMS et contient STOP.
+4. Arrêt automatique si le client répond par SMS après l'envoi du devis, s'il répond STOP, ou si l'artisan marque le devis gagné ou perdu.
+5. Tous les SMS sortants sont convertis en alphabet GSM-7 (ç → c, ê → e…) : 160 caractères par SMS au lieu de 70.
+
+Activer le planificateur (une seule fois, après le déploiement) :
+```sql
+select vault.create_secret('https://<ref>.supabase.co', 'project_url');
+select vault.create_secret('<même valeur que CRON_SECRET>', 'cron_secret');
+```
+
 ## Mise en route
 
 ### 1. Supabase
@@ -51,6 +65,7 @@ supabase secrets set --env-file supabase/functions/.env
 supabase functions deploy twilio-voice
 supabase functions deploy twilio-sms
 supabase functions deploy request-form
+supabase functions deploy quote-followups
 ```
 
 ### 2. Twilio
@@ -74,5 +89,4 @@ Appeler le numéro Twilio depuis son téléphone. On doit entendre le message, p
 - À vérifier sur les 4 opérateurs : le numéro du client est-il bien transmis après un renvoi `**61*` ?
 
 ## Prochaines étapes
-3. Relances de devis J+3 / J+7 / J+14 (stop si `replied_at` ou `opted_out`)
 4. Écrans artisan + bilan du mois

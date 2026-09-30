@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { clientSmsBody, handleIncomingCall } from "../_shared/missed-call.ts";
 import { handleIncomingSms, isStopRequest } from "../_shared/incoming-sms.ts";
 import { formatFrench, isHiddenCaller, toE164 } from "../_shared/phone.ts";
-import { isValidTwilioSignature } from "../_shared/twilio.ts";
+import { isGsm7, isValidTwilioSignature, toGsm7 } from "../_shared/twilio.ts";
 import type { Artisan, CallOutcome, Lead, MessageDirection, Store } from "../_shared/types.ts";
 
 // ---------- Faux Store en mémoire ----------
@@ -167,7 +167,10 @@ Deno.test("le SMS client tient en 1 seul SMS (160 caractères) pour un nom d'ent
   const body = clientSmsBody("Dupont Plomberie", "https://relais-artisan.fr/d/Ab3dEf7hJk");
   assert(body.length <= 160, `${body.length} caractères`);
   // Pas de caractère hors alphabet GSM-7 (sinon le SMS passe en UCS-2 : 70 caractères max).
-  assert(!/[çâêîôûœ]/.test(body));
+  assert(isGsm7(body));
+  assert(isGsm7("SMS de 06 11 22 33 44 a répondu STOP : il ne recevra plus de SMS automatiques."));
+  assert(!isGsm7("Reçu"), "ç minuscule hors GSM-7");
+  assert(!isGsm7("être"));
 });
 
 // ---------- Réponse SMS du client ----------
@@ -224,4 +227,10 @@ Deno.test("numéros : normalisation, affichage, appelants masqués", () => {
   assert(!isHiddenCaller(CLIENT));
   assert(isStopRequest("Arrêt"));
   assert(!isStopRequest("stop la fuite svp"));
+});
+
+Deno.test("conversion GSM-7 avant envoi : accents gardés si possible, le reste converti", () => {
+  assertEquals(toGsm7("Façade abîmée, chaudière « Saunier Duval » à côté – urgent 🔥"), 'Facade abimée, chaudière " Saunier Duval " à coté - urgent ');
+  assertEquals(toGsm7("Réponse très précise où ça ?"), "Réponse très précise où ca ?");
+  assert(isGsm7(toGsm7("Œuvre, être, île, sûr, ‘ok’…")));
 });

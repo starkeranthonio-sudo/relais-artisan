@@ -42,7 +42,7 @@ export function twilioSender(accountSid: string, authToken: string): SendSms {
         Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({ From: from, To: to, Body: body }),
+      body: new URLSearchParams({ From: from, To: to, Body: toGsm7(body) }), // 160 caractères par SMS au lieu de 70
     });
     const json = await res.json();
     if (!res.ok) throw new Error(`Twilio SMS ${res.status}: ${json.message ?? JSON.stringify(json)}`);
@@ -84,4 +84,38 @@ export async function readTwilioParams(req: Request): Promise<Record<string, str
 export function publicFunctionUrl(req: Request, functionName: string, supabaseUrl: string): string {
   const { search } = new URL(req.url);
   return `${supabaseUrl.replace(/\/$/, "")}/functions/v1/${functionName}${search}`;
+}
+
+// Alphabet GSM 03.38 (table de base + extension). Un seul caractère hors de cette liste (ç, ê, â, emoji…)
+// fait passer le SMS en UCS-2 : 70 caractères par SMS au lieu de 160, donc 2 à 3 fois plus cher.
+const GSM7 = new Set(
+  "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà" +
+    "^{}\\[~]|€",
+);
+
+export function isGsm7(text: string): boolean {
+  for (const c of text) if (!GSM7.has(c)) return false;
+  return true;
+}
+
+const GSM7_REPLACEMENTS: Record<string, string> = {
+  "œ": "oe", "Œ": "OE", "’": "'", "‘": "'", "“": '"', "”": '"', "«": '"', "»": '"',
+  "–": "-", "—": "-", "…": "...", "\u00a0": " ", "\u202f": " ",
+};
+
+/**
+ * Rend un texte compatible GSM-7 : garde é, è, à, ù (présents dans l'alphabet GSM), convertit ç → c, ê → e,
+ * « » → ", etc. Les caractères impossibles à convertir (emoji…) sont retirés.
+ */
+export function toGsm7(text: string): string {
+  let out = "";
+  for (const c of text) {
+    if (GSM7.has(c)) out += c;
+    else if (c in GSM7_REPLACEMENTS) out += GSM7_REPLACEMENTS[c];
+    else {
+      const base = c.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if ([...base].every((b) => GSM7.has(b))) out += base;
+    }
+  }
+  return out;
 }

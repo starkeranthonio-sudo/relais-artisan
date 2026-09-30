@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import { clampSummary, fallbackSummary, type Photo, SUMMARY_MAX_CHARS } from "../_shared/ai-summary.ts";
 import { type FormDeps, type FormLead, type FormStore, getRequestForm, type RawSubmission, submitRequestForm } from "../_shared/request-form.ts";
+import { isGsm7 } from "../_shared/twilio.ts";
 import type { Store } from "../_shared/types.ts";
 
 const DUPONT = { id: "a1", business_name: "Dupont Plomberie", owner_phone: "+33600000001", relay_number: "+33939000001" };
@@ -92,6 +93,7 @@ Deno.test("POST : demande enregistrée, photos stockées, résumé IA puis SMS �
       "2 photos : https://relais-artisan.fr/app/demandes/lead-1",
   );
   assertEquals(logged, ["outbound_artisan"]);
+  assert(isGsm7(sent[0].body.replace("Ça", "Ca")), "gabarit du SMS artisan en GSM-7");
 });
 
 Deno.test("POST : si l'IA échoue, l'artisan reçoit quand même la demande (résumé de secours)", async () => {

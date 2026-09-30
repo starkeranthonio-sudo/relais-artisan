@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import type { DueQuote, FollowupStore } from "./followups.ts";
 import type { FormLead, FormStore } from "./request-form.ts";
 import type { Artisan, Lead, Store } from "./types.ts";
 
@@ -123,6 +124,47 @@ export function supabaseFormStore(client: SupabaseClient): FormStore {
 
     async saveAiSummary(leadId, summary) {
       check(await client.from("leads").update({ ai_summary: summary }).eq("id", leadId));
+    },
+  };
+}
+
+/** Implémentation Supabase du FollowupStore (relances de devis). */
+export function supabaseFollowupStore(client: SupabaseClient): FollowupStore {
+  return {
+    async dueQuotes(now, limit) {
+      return check(
+        await client.from("quotes")
+          .select(
+            "id, sent_at, followups_sent, " +
+              "artisan:artisans(id, business_name, owner_phone, relay_number), " +
+              "lead:leads(id, client_phone, replied_at, opted_out)",
+          )
+          .eq("status", "pending").lte("next_followup_at", now.toISOString())
+          .order("next_followup_at").limit(limit),
+      ) as unknown as DueQuote[];
+    },
+
+    async claimFollowup(quoteId, followupsSent, nextFollowupAt, stopReason) {
+      const rows = check(
+        await client.from("quotes").update({
+          followups_sent: followupsSent + 1,
+          next_followup_at: nextFollowupAt?.toISOString() ?? null,
+          stop_reason: stopReason,
+        }).eq("id", quoteId).eq("followups_sent", followupsSent).eq("status", "pending").select("id"),
+      );
+      return (rows?.length ?? 0) > 0;
+    },
+
+    async releaseFollowup(quoteId, followupsSent, retryAt) {
+      check(
+        await client.from("quotes")
+          .update({ followups_sent: followupsSent, next_followup_at: retryAt.toISOString(), stop_reason: null })
+          .eq("id", quoteId).eq("followups_sent", followupsSent + 1),
+      );
+    },
+
+    async stop(quoteId, reason) {
+      check(await client.from("quotes").update({ next_followup_at: null, stop_reason: reason }).eq("id", quoteId));
     },
   };
 }
