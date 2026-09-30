@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import type { FormLead, FormStore } from "./request-form.ts";
 import type { Artisan, Lead, Store } from "./types.ts";
 
 const LEAD_COLUMNS = "id, artisan_id, client_phone, public_token, call_count, sms_sent_at";
@@ -82,6 +83,46 @@ export function supabaseStore(client: SupabaseClient): Store {
         body,
         twilio_sid: twilioSid ?? null,
       }));
+    },
+  };
+}
+
+/** Implémentation Supabase du FormStore (page de demande). */
+export function supabaseFormStore(client: SupabaseClient): FormStore {
+  return {
+    async findLeadByToken(token) {
+      const row = check(
+        await client.from("leads")
+          .select("id, client_phone, form_submitted_at, artisan:artisans(id, business_name, owner_phone, relay_number)")
+          .eq("public_token", token).maybeSingle(),
+      ) as (Omit<FormLead, "artisan"> & { artisan: Artisan | null }) | null;
+      return row?.artisan ? { ...row, artisan: row.artisan } : null;
+    },
+
+    async uploadPhoto(path, photo) {
+      const { error } = await client.storage.from("lead-photos")
+        .upload(path, photo.bytes, { contentType: photo.mediaType, upsert: true });
+      if (error) throw new Error(error.message);
+    },
+
+    async saveSubmission(leadId, s, at) {
+      const rows = check(
+        await client.from("leads").update({
+          client_name: s.clientName || null,
+          work_type: s.workType,
+          description: s.description,
+          address: s.address,
+          urgency: s.urgency,
+          photo_paths: s.photoPaths,
+          form_submitted_at: at.toISOString(),
+          status: "form_submitted",
+        }).eq("id", leadId).is("form_submitted_at", null).select("id"),
+      );
+      return (rows?.length ?? 0) > 0;
+    },
+
+    async saveAiSummary(leadId, summary) {
+      check(await client.from("leads").update({ ai_summary: summary }).eq("id", leadId));
     },
   };
 }

@@ -24,6 +24,21 @@ Règles de fonctionnement :
 | `supabase/functions/_shared/incoming-sms.ts` | Logique réponse client → artisan |
 | `supabase/functions/tests/` | Tests (`deno test --allow-env supabase/functions/tests/`) |
 
+## Étape 2 : page de demande + résumé IA ✅
+
+1. Le lien du SMS ouvre `/d/<token>` (application `web/`, Vite + React) : type de travaux, description, urgence, adresse, jusqu'à 3 photos (réduites sur le téléphone avant l'envoi), prénom.
+2. L'Edge Function `request-form` enregistre la demande et stocke les photos dans le bucket privé `lead-photos`.
+3. Claude (`claude-opus-5-5`, effort `low`) résume la demande en 160 caractères maximum, en tenant compte des photos. Si l'IA ne répond pas, un résumé de secours est envoyé.
+4. L'artisan reçoit un SMS :
+   ```
+   Nouvelle demande - Marie 06 11 22 33 44
+   URGENT (aujourd'hui) - 12 rue des Lilas, Vélizy
+   Fuite sous évier cuisine, joint siphon à changer.
+   2 photos : https://…/app/demandes/<id>
+   ```
+
+Démo sans backend : `cd web && npm run dev`, puis ouvrir `http://localhost:5173/d/demo`.
+
 ## Mise en route
 
 ### 1. Supabase
@@ -35,6 +50,7 @@ cp supabase/functions/.env.example supabase/functions/.env   # puis remplir les 
 supabase secrets set --env-file supabase/functions/.env
 supabase functions deploy twilio-voice
 supabase functions deploy twilio-sms
+supabase functions deploy request-form
 ```
 
 ### 2. Twilio
@@ -58,6 +74,5 @@ Appeler le numéro Twilio depuis son téléphone. On doit entendre le message, p
 - À vérifier sur les 4 opérateurs : le numéro du client est-il bien transmis après un renvoi `**61*` ?
 
 ## Prochaines étapes
-2. Page de demande `/d/<token>` + résumé IA envoyé à l'artisan
 3. Relances de devis J+3 / J+7 / J+14 (stop si `replied_at` ou `opted_out`)
 4. Écrans artisan + bilan du mois

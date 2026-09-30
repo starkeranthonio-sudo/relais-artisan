@@ -418,3 +418,7 @@ verify_jwt = false
 
 [functions.twilio-sms]
 verify_jwt = false
+
+# Page de demande : appelée par le navigateur du client, protégée par le jeton unique de la demande.
+[functions.request-form]
+verify_jwt = false
