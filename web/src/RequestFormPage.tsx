@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { ApiError, fetchFormInfo, type FormInfo, submitRequest, type Urgency } from "./api.ts";
+import { AddressInput } from "./AddressInput.tsx";
 import { shrinkPhoto } from "./image.ts";
 
 const MAX_PHOTOS = 3;
@@ -38,9 +39,9 @@ export function RequestFormPage({ token }: { token: string }) {
 
   return (
     <main className="page">
-      {state.kind === "loading" && <div className="card center muted" aria-busy="true">Chargement…</div>}
+      {state.kind === "loading" && <div className="center muted" aria-busy="true">Chargement…</div>}
       {state.kind === "invalid" && (
-        <div className="card center">
+        <div className="center">
           <h1>Lien invalide</h1>
           <p className="muted">{state.message}</p>
         </div>
@@ -58,8 +59,10 @@ export function RequestFormPage({ token }: { token: string }) {
 
 function Thanks({ businessName }: { businessName: string }) {
   return (
-    <div className="card center">
-      <div className="check" aria-hidden="true">✓</div>
+    <div className="center">
+      <svg className="check" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
       <h1>Demande envoyée</h1>
       <p><strong>{businessName}</strong> a bien reçu votre demande et vous recontacte rapidement.</p>
       <p className="muted small">Vous pouvez fermer cette page.</p>
@@ -135,11 +138,11 @@ function RequestForm({ token, info, onDone }: { token: string; info: FormInfo; o
   }
 
   return (
-    <form className="card" onSubmit={onSubmit} noValidate>
+    <form className="form" onSubmit={onSubmit} noValidate>
       <header className="intro">
         <p className="eyebrow">{info.businessName}</p>
         <h1>Désolé d'avoir manqué votre appel</h1>
-        <p className="muted">Décrivez votre besoin en 1 minute, je vous recontacte rapidement.</p>
+        <p className="lead">Décrivez votre besoin en 1 minute, je vous recontacte rapidement.</p>
       </header>
 
       <fieldset>
@@ -178,20 +181,14 @@ function RequestForm({ token, info, onDone }: { token: string; info: FormInfo; o
         </div>
       </fieldset>
 
-      <label className="field">
-        <span className="label">Adresse de l'intervention</span>
-        <input
-          type="text"
-          autoComplete="street-address"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="Ex. : 12 rue des Lilas, Vélizy"
-        />
-      </label>
+      <div className="field">
+        <span className="label" id="address-label">Adresse de l'intervention</span>
+        <AddressInput value={address} onChange={setAddress} labelledBy="address-label" />
+      </div>
 
       <div className="field">
-        <span className="label">Photos <span className="optional">facultatif, {MAX_PHOTOS} max.</span></span>
-        <p className="muted small">Une photo aide beaucoup à préparer l'intervention.</p>
+        <span className="label">Photos<span className="optional">facultatif, {MAX_PHOTOS} max.</span></span>
+        <p className="hint">Une photo aide beaucoup à préparer l'intervention.</p>
         <div className="photos">
           {photos.map((p, i) => (
             <div key={p.url} className="thumb">
@@ -216,15 +213,17 @@ function RequestForm({ token, info, onDone }: { token: string; info: FormInfo; o
       </div>
 
       <label className="field">
-        <span className="label">Votre prénom <span className="optional">facultatif</span></span>
+        <span className="label">Votre prénom<span className="optional">facultatif</span></span>
         <input type="text" autoComplete="given-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} />
       </label>
 
       {error && <p ref={errorRef} className="error" role="alert">{error}</p>}
 
-      <button type="submit" className="submit" disabled={sending || photoBusy}>
-        {sending ? "Envoi…" : "Envoyer ma demande"}
-      </button>
+      <div className="submit-bar">
+        <button type="submit" className="submit" disabled={sending || photoBusy}>
+          {sending ? "Envoi…" : "Envoyer ma demande"}
+        </button>
+      </div>
     </form>
   );
 }
