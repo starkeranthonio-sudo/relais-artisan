@@ -1,1 +1,63 @@
-# relais-artisan
+# Relais Artisan (nom provisoire)
+
+Un artisan ne perd plus de client à cause d'un appel manqué ou d'un devis oublié.
+
+## Étape 1 : appel manqué → SMS ✅
+
+1. L'artisan renvoie ses appels non répondus vers son **numéro relais** (`**61*<numéro relais>#`).
+2. Le client entend un court message (« Vous allez recevoir un SMS… ») et l'appel raccroche.
+3. Le SMS part depuis le numéro relais : `Dupont Plomberie : désolé d'avoir manqué votre appel. Décrivez votre besoin ici, je vous rappelle vite : <lien>`.
+4. Si le client répond par SMS, la réponse est enregistrée puis transférée sur le portable de l'artisan. `STOP` désinscrit le client.
+
+Règles de fonctionnement :
+- Si le même client rappelle dans les 7 jours, son appel est rattaché à la même demande.
+- Un client reçoit au plus un SMS toutes les 24 h.
+- Si l'appelant a masqué son numéro, un message spécifique est lu et aucun SMS n'est envoyé.
+- Si Twilio renvoie deux fois le même appel, un seul SMS part.
+
+| Fichier | Rôle |
+|---|---|
+| `supabase/migrations/…_init.sql` | Tables `artisans`, `leads`, `calls`, `messages` + RLS |
+| `supabase/functions/twilio-voice` | Webhook « appel entrant » du numéro relais |
+| `supabase/functions/twilio-sms` | Webhook « SMS entrant » du numéro relais |
+| `supabase/functions/_shared/missed-call.ts` | Logique appel manqué → SMS |
+| `supabase/functions/_shared/incoming-sms.ts` | Logique réponse client → artisan |
+| `supabase/functions/tests/` | Tests (`deno test --allow-env supabase/functions/tests/`) |
+
+## Mise en route
+
+### 1. Supabase
+```bash
+supabase login
+supabase link --project-ref <ref-du-projet>
+supabase db push
+cp supabase/functions/.env.example supabase/functions/.env   # puis remplir les valeurs
+supabase secrets set --env-file supabase/functions/.env
+supabase functions deploy twilio-voice
+supabase functions deploy twilio-sms
+```
+
+### 2. Twilio
+1. Créer un compte sur twilio.com. L'essai gratuit donne du crédit, mais les SMS ne partent que vers des **numéros vérifiés** et commencent par « Sent from your Twilio trial account ».
+2. Pour les tests, acheter un numéro qui accepte la voix et les SMS. Un vrai numéro français `+33 9 39…` demandera un K-bis (voir « Production » plus bas).
+3. Dans la page du numéro, configurer :
+   - **A call comes in** → Webhook POST → `https://<ref>.supabase.co/functions/v1/twilio-voice`
+   - **A message comes in** → Webhook POST → `https://<ref>.supabase.co/functions/v1/twilio-sms`
+
+### 3. Créer un artisan de test (SQL Editor de Supabase)
+```sql
+insert into artisans (business_name, owner_phone, relay_number)
+values ('Dupont Plomberie', '+336XXXXXXXX', '+<numero-twilio>');
+```
+
+### 4. Tester
+Appeler le numéro Twilio depuis son téléphone. On doit entendre le message, puis recevoir le SMS. Répondre au SMS : la réponse doit arriver sur `owner_phone`.
+
+## Production (France)
+- Les numéros 06 et 07 sont interdits pour les SMS automatiques (ARCEP, décision 22-1583). Il faut utiliser des numéros **+33 9 37 / 38 / 39 « plateforme technique »**, qui exigent un bundle réglementaire Twilio : K-bis, adresse en France, représentant légal.
+- À vérifier sur les 4 opérateurs : le numéro du client est-il bien transmis après un renvoi `**61*` ?
+
+## Prochaines étapes
+2. Page de demande `/d/<token>` + résumé IA envoyé à l'artisan
+3. Relances de devis J+3 / J+7 / J+14 (stop si `replied_at` ou `opted_out`)
+4. Écrans artisan + bilan du mois
