@@ -33,9 +33,15 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 export type SendSms = (from: string, to: string, body: string) => Promise<{ sid: string }>;
 
-/** Envoie un SMS via l'API REST Twilio. */
-export function twilioSender(accountSid: string, authToken: string): SendSms {
-  return async (from, to, body) => {
+/**
+ * Envoie un SMS via l'API REST Twilio.
+ * `senderId` (facultatif) : nom d'expéditeur alphanumérique (11 caractères max, ex. « RelaisArt ») utilisé à la place
+ * du numéro relais. Utile tant que le numéro relais ne peut pas envoyer de SMS (numéro américain non enregistré A2P) ;
+ * le client ne peut alors pas répondre au SMS.
+ */
+export function twilioSender(accountSid: string, authToken: string, senderId?: string): SendSms {
+  return async (relayNumber, to, body) => {
+    const from = senderId || relayNumber;
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
       method: "POST",
       headers: {

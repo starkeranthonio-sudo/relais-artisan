@@ -13,8 +13,11 @@ const client = serviceClient();
 const deps = {
   store: supabaseStore(client),
   formStore: supabaseFormStore(client),
-  sendSms: twilioSender(requireEnv("TWILIO_ACCOUNT_SID"), requireEnv("TWILIO_AUTH_TOKEN")),
-  summarize: claudeSummarizer(new Anthropic({ apiKey: requireEnv("ANTHROPIC_API_KEY") })),
+  sendSms: twilioSender(requireEnv("TWILIO_ACCOUNT_SID"), requireEnv("TWILIO_AUTH_TOKEN"), Deno.env.get("SMS_SENDER_ID")),
+  // Sans clé Anthropic, l'artisan reçoit le résumé de secours (type de travaux + début du message).
+  summarize: Deno.env.get("ANTHROPIC_API_KEY")
+    ? claudeSummarizer(new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") }))
+    : () => Promise.reject(new Error("ANTHROPIC_API_KEY non configurée")),
   appUrl: requireEnv("PUBLIC_APP_URL"),
 };
 

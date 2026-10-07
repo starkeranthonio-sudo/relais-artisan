@@ -9,7 +9,7 @@ const client = serviceClient();
 const deps = {
   store: supabaseStore(client),
   followups: supabaseFollowupStore(client),
-  sendSms: twilioSender(requireEnv("TWILIO_ACCOUNT_SID"), requireEnv("TWILIO_AUTH_TOKEN")),
+  sendSms: twilioSender(requireEnv("TWILIO_ACCOUNT_SID"), requireEnv("TWILIO_AUTH_TOKEN"), Deno.env.get("SMS_SENDER_ID")),
 };
 
 Deno.serve(async (req) => {

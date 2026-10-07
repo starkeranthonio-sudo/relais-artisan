@@ -10,7 +10,7 @@ const accountSid = requireEnv("TWILIO_ACCOUNT_SID");
 const authToken = requireEnv("TWILIO_AUTH_TOKEN");
 const appUrl = requireEnv("PUBLIC_APP_URL");
 const store = supabaseStore(serviceClient());
-const sendSms = twilioSender(accountSid, authToken);
+const sendSms = twilioSender(accountSid, authToken, Deno.env.get("SMS_SENDER_ID"));
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });

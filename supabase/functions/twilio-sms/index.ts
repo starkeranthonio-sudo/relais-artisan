@@ -8,7 +8,7 @@ declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 const authToken = requireEnv("TWILIO_AUTH_TOKEN");
 const store = supabaseStore(serviceClient());
-const sendSms = twilioSender(requireEnv("TWILIO_ACCOUNT_SID"), authToken);
+const sendSms = twilioSender(requireEnv("TWILIO_ACCOUNT_SID"), authToken, Deno.env.get("SMS_SENDER_ID"));
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
