@@ -11,6 +11,8 @@ export interface Profile {
   referral_code: string;
   sms_sender: string;
   daily_recap: boolean;
+  client_sms_template: string | null;
+  google_review_url: string | null;
 }
 
 export interface OutgoingTransfer {
@@ -53,6 +55,7 @@ export interface Lead {
   form_submitted_at: string | null;
   replied_at: string | null;
   opted_out: boolean;
+  review_requested_at: string | null;
   quote: Quote | null;
 }
 
@@ -72,12 +75,12 @@ export interface MonthStats {
 
 export type EventName =
   | "app_open" | "lead_view" | "lead_call" | "lead_sms" | "quote_declared" | "quote_won" | "quote_lost"
-  | "transfer_sent" | "referral_share" | "stats_view";
+  | "transfer_sent" | "referral_share" | "stats_view" | "sms_template_saved" | "review_requested";
 
 export interface ArtisanApi {
   readonly demo: boolean;
   getProfile(): Promise<Profile | null>;
-  updateProfile(patch: Partial<Pick<Profile, "business_name" | "owner_phone" | "sms_sender" | "daily_recap">>): Promise<void>;
+  updateProfile(patch: Partial<Pick<Profile, "business_name" | "owner_phone" | "sms_sender" | "daily_recap" | "client_sms_template" | "google_review_url">>): Promise<void>;
   listLeads(): Promise<Lead[]>;
   getLead(id: string): Promise<Lead | null>;
   photoUrls(paths: string[]): Promise<string[]>;
@@ -91,6 +94,10 @@ export interface ArtisanApi {
   /** Dernière transmission envoyée pour cette demande, s'il y en a une. */
   outgoingTransfer(leadId: string): Promise<OutgoingTransfer | null>;
   referrals(): Promise<Referrals>;
+  /** Envoie au client la demande d'avis Google (chantier terminé). */
+  requestReview(leadId: string): Promise<void>;
+  /** Montant gagné par mois (« AAAA-MM » → centimes), pour comparer les mois entre eux. */
+  wonByMonth(): Promise<Record<string, number>>;
   /** Identifiant d'une demande à partir du jeton court du lien SMS (/app/l/<jeton>). */
   leadIdByToken(token: string): Promise<string | null>;
   /** Mesure d'usage (Habit Testing). Ne bloque jamais l'interface et n'échoue jamais. */

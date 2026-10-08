@@ -15,7 +15,7 @@ supabase.auth.onAuthStateChange(() => {
 
 const LEAD_COLUMNS =
   "id, client_phone, client_name, work_type, description, address, urgency, photo_paths, ai_summary, status, " +
-  "call_count, created_at, last_call_at, form_submitted_at, replied_at, opted_out, quote:quotes(*)";
+  "call_count, created_at, last_call_at, form_submitted_at, replied_at, opted_out, review_requested_at, quote:quotes(*)";
 
 function ok<T>({ data, error }: { data: T; error: { message: string } | null }): T {
   if (error) throw new Error(error.message);
@@ -37,7 +37,7 @@ export const supabaseApi: ArtisanApi = {
   demo: false,
 
   async getProfile() {
-    return ok(await supabase.from("artisans").select("id, business_name, owner_phone, relay_number, referral_code, sms_sender, daily_recap").maybeSingle());
+    return ok(await supabase.from("artisans").select("id, business_name, owner_phone, relay_number, referral_code, sms_sender, daily_recap, client_sms_template, google_review_url").maybeSingle());
   },
 
   async updateProfile(patch) {
@@ -125,6 +125,32 @@ export const supabaseApi: ArtisanApi = {
   async referrals() {
     const rows = ok(await supabase.from("my_referrals").select("business_name").order("created_at"));
     return { names: (rows ?? []).map((r) => r.business_name as string) };
+  },
+
+  async requestReview(leadId) {
+    const FUNCTIONS = (import.meta.env.VITE_FUNCTIONS_URL as string).replace(/\/$/, "");
+    const { data } = await supabase.auth.getSession();
+    const res = await fetch(`${FUNCTIONS}/review-request`, {
+      method: "POST",
+      headers: {
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+        "Content-Type": "application/json",
+        ...(data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}),
+      },
+      body: JSON.stringify({ leadId }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Envoi impossible.");
+  },
+
+  async wonByMonth() {
+    const rows = ok(await supabase.from("quotes").select("amount_cents, decided_at").eq("status", "won").not("decided_at", "is", null));
+    const byMonth: Record<string, number> = {};
+    for (const q of rows ?? []) {
+      const d = new Date(q.decided_at as string);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      byMonth[key] = (byMonth[key] ?? 0) + ((q.amount_cents as number | null) ?? 0);
+    }
+    return byMonth;
   },
 
   async leadIdByToken(token) {

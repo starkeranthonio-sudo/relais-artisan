@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { handleIncomingCall } from "../_shared/missed-call.ts";
+import { clientSmsBody, handleIncomingCall } from "../_shared/missed-call.ts";
 import { twilioSender } from "../_shared/twilio.ts";
 import type { Artisan, Store } from "../_shared/types.ts";
 
@@ -49,4 +49,16 @@ Deno.test("le SMS au client après un appel manqué part au nom de l'artisan", a
   });
   await res.afterResponse!();
   assertEquals(senders, ["Starker"]);
+});
+
+Deno.test("SMS personnalisé : {nom} et {lien} remplacés ; texte par défaut si pas de {lien} ou trop long", () => {
+  const link = "https://relais-artisan.pages.dev/d/Ab3dEf7hJk";
+  assertEquals(
+    clientSmsBody("Starker", link, "Bonjour, ici {nom}. Je suis sur un chantier, dites-moi tout ici : {lien}"),
+    `Bonjour, ici Starker. Je suis sur un chantier, dites-moi tout ici : ${link}`,
+  );
+  const fallback = clientSmsBody("Starker", link);
+  assertEquals(clientSmsBody("Starker", link, "Je vous rappelle très vite !"), fallback, "sans {lien}");
+  assertEquals(clientSmsBody("Starker", link, "x".repeat(140) + " {lien}"), fallback, "trop long pour 1 SMS");
+  assertEquals(clientSmsBody("Starker", link, null), fallback);
 });

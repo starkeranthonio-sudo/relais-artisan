@@ -1,5 +1,5 @@
 import { isHiddenCaller } from "./phone.ts";
-import type { SendSms } from "./twilio.ts";
+import { type SendSms, toGsm7 } from "./twilio.ts";
 import type { Store } from "./types.ts";
 
 /** Une demande reste « ouverte » 7 jours : un client qui rappelle pendant ce délai ne crée pas de nouvelle demande. */
@@ -22,8 +22,19 @@ export interface CallResult {
   afterResponse?: () => Promise<void>;
 }
 
-export function clientSmsBody(businessName: string, link: string): string {
-  return `${businessName} : désolé d'avoir manqué votre appel. Décrivez votre besoin ici, je vous rappelle vite : ${link}`;
+export const DEFAULT_CLIENT_SMS = "{nom} : désolé d'avoir manqué votre appel. Décrivez votre besoin ici, je vous rappelle vite : {lien}";
+
+/**
+ * SMS envoyé au client après un appel manqué. L'artisan peut écrire le sien ({nom}, {lien}) ;
+ * on revient au texte par défaut si le sien n'a pas de {lien} ou dépasse 1 SMS (160 caractères après conversion GSM-7).
+ */
+export function clientSmsBody(businessName: string, link: string, template?: string | null): string {
+  const render = (t: string) => t.replaceAll("{nom}", businessName).replaceAll("{lien}", link).trim();
+  if (template && template.includes("{lien}")) {
+    const custom = render(template);
+    if (toGsm7(custom).length <= 160) return custom;
+  }
+  return render(DEFAULT_CLIENT_SMS);
 }
 
 /**
@@ -79,7 +90,7 @@ export async function handleIncomingCall(params: Record<string, string>, deps: D
   }
 
   const leadId = lead.id;
-  const body = clientSmsBody(artisan.business_name, `${deps.appUrl.replace(/\/$/, "")}/d/${lead.public_token}`);
+  const body = clientSmsBody(artisan.business_name, `${deps.appUrl.replace(/\/$/, "")}/d/${lead.public_token}`, artisan.client_sms_template);
 
   return {
     speech: standardSpeech,

@@ -3,6 +3,7 @@ import { formatFrench } from "./phone.ts";
 import type { DueQuote, FollowupStore } from "./followups.ts";
 import type { FormLead, FormStore } from "./request-form.ts";
 import type { MonthlyStore } from "./monthly.ts";
+import type { ReviewArtisan, ReviewLead, ReviewStore } from "./reviews.ts";
 import { classifyPendingQuotes, parisDate, type RecapArtisan, type RecapStore } from "./recap.ts";
 import type { Transfer, TransferArtisan, TransferLead, TransferStore } from "./transfers.ts";
 import type { Artisan, Lead, Store } from "./types.ts";
@@ -19,7 +20,7 @@ export function supabaseStore(client: SupabaseClient): Store {
   return {
     async findArtisanByRelay(relayNumber) {
       return check(
-        await client.from("artisans").select("id, business_name, owner_phone, relay_number, sms_sender")
+        await client.from("artisans").select("id, business_name, owner_phone, relay_number, sms_sender, client_sms_template")
           .eq("relay_number", relayNumber).maybeSingle(),
       ) as Artisan | null;
     },
@@ -338,6 +339,42 @@ export function supabaseMonthlyStore(client: SupabaseClient): MonthlyStore {
       return (rows?.length ?? 0) > 0;
     },
   };
+}
+
+/** Implémentation Supabase du ReviewStore (demande d'avis Google). */
+export function supabaseReviewStore(client: SupabaseClient): ReviewStore {
+  return {
+    async getLead(leadId) {
+      const row = check(
+        await client.from("leads").select("id, artisan_id, client_phone, client_name, opted_out, review_requested_at, quotes(status)")
+          .eq("id", leadId).maybeSingle(),
+      ) as (Omit<ReviewLead, "quote_status"> & { quotes: { status: ReviewLead["quote_status"] } | { status: ReviewLead["quote_status"] }[] | null }) | null;
+      if (!row) return null;
+      const { quotes, ...lead } = row;
+      const q = Array.isArray(quotes) ? quotes[0] : quotes;
+      return { ...lead, quote_status: q?.status ?? null };
+    },
+    async markRequested(leadId, at) {
+      const rows = check(
+        await client.from("leads").update({ review_requested_at: at.toISOString() }).eq("id", leadId).is("review_requested_at", null).select("id"),
+      );
+      return (rows?.length ?? 0) > 0;
+    },
+    async unmarkRequested(leadId) {
+      check(await client.from("leads").update({ review_requested_at: null }).eq("id", leadId));
+    },
+  };
+}
+
+/** Artisan connecté avec les champs utiles à la demande d'avis. */
+export async function reviewArtisanFromRequest(client: SupabaseClient, req: Request): Promise<ReviewArtisan | null> {
+  const jwt = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!jwt) return null;
+  const { data, error } = await client.auth.getUser(jwt);
+  if (error || !data.user) return null;
+  return check(
+    await client.from("artisans").select("id, business_name, relay_number, sms_sender, google_review_url").eq("user_id", data.user.id).maybeSingle(),
+  ) as ReviewArtisan | null;
 }
 
 /** Artisan connecté, à partir de l'en-tête Authorization (jeton Supabase Auth). null si absent ou invalide. */

@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
 import { useApp, useLoad } from "./context.tsx";
 import { formatPhone, nationalDigits, toE164 } from "./format.ts";
+import { checkTemplate, DEFAULT_CLIENT_SMS, renderClientSms, toGsm7 } from "./smsTemplate.ts";
 import type { Profile } from "./types.ts";
 
 /** Règles des opérateurs pour un expéditeur SMS alphanumérique. */
@@ -27,6 +28,8 @@ export function SetupPage() {
         <p className="lead">3 minutes, une seule fois. Ensuite, chaque appel manqué est récupéré automatiquement.</p>
       </header>
       {profile.relay_number ? <Steps relay={profile.relay_number} /> : <Pending />}
+      <SmsTemplateEditor profile={profile} onSaved={reload} />
+      <GoogleReviewLink profile={profile} onSaved={reload} />
       <RecapToggle enabled={profile.daily_recap} onChange={reload} />
       <Referral code={profile.referral_code} businessName={profile.business_name} />
       <ProfileForm profile={profile} onSaved={reload} />
@@ -237,5 +240,84 @@ function RecapToggle({ enabled, onChange }: { enabled: boolean; onChange: () => 
         <span />
       </button>
     </div>
+  );
+}
+
+/** Le SMS envoyé au client après un appel manqué, écrit par l'artisan (investissement : l'outil devient « le sien »). */
+function SmsTemplateEditor({ profile, onSaved }: { profile: Profile; onSaved: () => void }) {
+  const { api } = useApp();
+  const [text, setText] = useState(profile.client_sms_template ?? DEFAULT_CLIENT_SMS);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const check = checkTemplate(text, profile.business_name);
+  const isDefault = text.trim() === DEFAULT_CLIENT_SMS;
+
+  async function save() {
+    if (!check.ok) return setMsg({ ok: false, text: check.reason });
+    try {
+      await api.updateProfile({ client_sms_template: isDefault ? null : text.trim() });
+      api.track("sms_template_saved", { custom: !isDefault, length: check.length });
+      setMsg({ ok: true, text: "Enregistré. Vos prochains clients recevront ce message." });
+      onSaved();
+    } catch {
+      setMsg({ ok: false, text: "Enregistrement impossible." });
+    }
+  }
+
+  return (
+    <div className="panel stack">
+      <div>
+        <h2>Votre message aux clients</h2>
+        <p className="muted small">Envoyé juste après un appel manqué. Écrivez-le avec vos mots. <code>{"{nom}"}</code> = votre entreprise, <code>{"{lien}"}</code> = la page où le client décrit son besoin (obligatoire).</p>
+      </div>
+      <textarea rows={4} maxLength={300} value={text} onChange={(e) => { setText(e.target.value); setMsg(null); }} />
+      <div className="sms-preview">
+        <span className="sms-preview-from">{profile.sms_sender}</span>
+        <p>{toGsm7(renderClientSms(text, profile.business_name))}</p>
+      </div>
+      <p className={`small ${check.ok ? "muted" : "accent"}`}>{check.ok ? `${check.length}/160 caractères · 1 SMS` : check.reason}</p>
+      {msg && <p className={msg.ok ? "success" : "error"}>{msg.text}</p>}
+      <div className="actions-2">
+        <button className="btn-primary" onClick={save} disabled={!check.ok}>Enregistrer</button>
+        <button className="btn-secondary" onClick={() => { setText(DEFAULT_CLIENT_SMS); setMsg(null); }} disabled={isDefault}>Texte par défaut</button>
+      </div>
+    </div>
+  );
+}
+
+/** Lien d'avis Google de l'artisan, utilisé par « Chantier terminé : demander un avis ». */
+function GoogleReviewLink({ profile, onSaved }: { profile: Profile; onSaved: () => void }) {
+  const { api } = useApp();
+  const [url, setUrl] = useState(profile.google_review_url ?? "");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    const clean = url.trim();
+    if (clean && !/^https:\/\/\S+$/.test(clean)) return setMsg({ ok: false, text: "Collez le lien complet, qui commence par https://" });
+    try {
+      await api.updateProfile({ google_review_url: clean || null });
+      setMsg({ ok: true, text: clean ? "Enregistré." : "Lien supprimé." });
+      onSaved();
+    } catch {
+      setMsg({ ok: false, text: "Enregistrement impossible." });
+    }
+  }
+
+  return (
+    <form className="panel stack" onSubmit={save}>
+      <div>
+        <h2>Avis Google</h2>
+        <p className="muted small">
+          Quand un chantier est terminé, demandez un avis à votre client en un clic. Plus d'avis, c'est plus d'appels.
+          Votre lien se trouve dans votre fiche Google : <strong>Demander des avis</strong> → copier le lien.
+        </p>
+      </div>
+      <label className="field">
+        <span className="label">Votre lien d'avis Google</span>
+        <input type="url" inputMode="url" value={url} onChange={(e) => { setUrl(e.target.value); setMsg(null); }} placeholder="https://g.page/r/…/review" />
+      </label>
+      {msg && <p className={msg.ok ? "success" : "error"}>{msg.text}</p>}
+      <button className="btn-secondary">Enregistrer</button>
+    </form>
   );
 }

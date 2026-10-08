@@ -4,6 +4,7 @@ export interface Artisan {
   owner_phone: string;
   relay_number: string;
   sms_sender?: string;
+  client_sms_template?: string | null;
 }
 
 export interface Lead {

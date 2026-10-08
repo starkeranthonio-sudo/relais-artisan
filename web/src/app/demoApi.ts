@@ -10,7 +10,8 @@ const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 const inMs = (ms: number) => new Date(Date.now() + ms).toISOString();
 
 const profile: Profile = {
-  id: "demo", business_name: "Dupont Plomberie", owner_phone: "+33612345678", relay_number: "+33939012345", referral_code: "demo123", sms_sender: "DupontPlomb", daily_recap: true,
+  id: "demo", business_name: "Dupont Plomberie", owner_phone: "+33612345678", relay_number: "+33939012345", referral_code: "demo123", sms_sender: "DupontPlomb", daily_recap: true, client_sms_template: null,
+  google_review_url: "https://g.page/r/demo/review",
 };
 const transfers = new Map<string, OutgoingTransfer>();
 
@@ -18,7 +19,7 @@ function lead(p: Partial<Lead> & Pick<Lead, "id" | "client_phone">): Lead {
   return {
     client_name: null, work_type: null, description: null, address: null, urgency: null, photo_paths: [],
     ai_summary: null, status: "new", call_count: 1, created_at: ago(H), last_call_at: ago(H),
-    form_submitted_at: null, replied_at: null, opted_out: false, quote: null, ...p,
+    form_submitted_at: null, replied_at: null, opted_out: false, review_requested_at: null, quote: null, ...p,
   };
 }
 
@@ -131,6 +132,18 @@ export const demoApi: ArtisanApi = {
   outgoingTransfer: async (leadId) => transfers.get(leadId) ?? null,
   referrals: async () => ({ names: ["Martin Électricité", "Leroy Chauffage"] }),
   leadIdByToken: async () => "l1",
+  requestReview: async (leadId) => {
+    find(leadId)!.review_requested_at = new Date().toISOString();
+  },
+  wonByMonth: async () => {
+    const key = (offset: number) => {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() - offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    };
+    return { [key(0)]: 527000, [key(1)]: 318000, [key(2)]: 405000 };
+  },
   track: () => {},
   signOut: async () => {},
 };

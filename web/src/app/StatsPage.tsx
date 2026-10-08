@@ -15,6 +15,9 @@ export function StatsPage() {
     return m ? new Date(Number(m[1]), Number(m[2]) - 1, 1) : new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const { data: s, error } = useLoad(() => api.monthStats(month), [api, month.getTime()]);
+  const prevMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
+  const { data: prev } = useLoad(() => api.monthStats(prevMonth), [api, prevMonth.getTime()]);
+  const { data: history } = useLoad(() => api.wonByMonth(), [api]);
   useEffect(() => {
     api.track("stats_view");
   }, [api]);
@@ -43,6 +46,7 @@ export function StatsPage() {
             <span className="eyebrow">Devis signés</span>
             <span className="hero-value">{euros(s.wonAmountCents)}</span>
             <span className="muted">{s.quotesWon} chantier{s.quotesWon > 1 ? "s" : ""} gagné{s.quotesWon > 1 ? "s" : ""}</span>
+            <Progress current={s.wonAmountCents} currentCount={s.quotesWon} prev={prev} prevLabel={monthName(prevMonth)} best={isBestMonth(month, s.wonAmountCents, history)} />
           </div>
 
           <dl className="stat-grid">
@@ -71,6 +75,37 @@ function Stat({ value, label }: { value: number | string; label: string }) {
     <div className="stat">
       <dt>{label}</dt>
       <dd>{value}</dd>
+    </div>
+  );
+}
+
+const monthName = (d: Date) => new Intl.DateTimeFormat("fr-FR", { month: "long" }).format(d);
+const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+/** Meilleur mois : plus de montant signé que tous les mois précédents (et au moins un mois précédent avec du chiffre). */
+function isBestMonth(month: Date, amount: number, history: Record<string, number> | undefined): boolean {
+  if (!history || amount <= 0) return false;
+  const key = monthKey(month);
+  const previous = Object.entries(history).filter(([k]) => k < key).map(([, v]) => v);
+  return previous.some((v) => v > 0) && amount > Math.max(...previous);
+}
+
+/** Récompense « soi » : progression par rapport au mois précédent. */
+function Progress({ current, currentCount, prev, prevLabel, best }: {
+  current: number; currentCount: number; prev: { wonAmountCents: number; quotesWon: number } | undefined; prevLabel: string; best: boolean;
+}) {
+  if (!prev) return null;
+  const diffCount = currentCount - prev.quotesWon;
+  const diffAmount = current - prev.wonAmountCents;
+  return (
+    <div className="progress">
+      {best && <span className="badge badge-best">Meilleur mois</span>}
+      {(prev.quotesWon > 0 || currentCount > 0) && (
+        <span className={`small ${diffAmount > 0 ? "accent" : "muted"}`}>
+          {diffCount === 0 ? "Autant de chantiers" : `${diffCount > 0 ? "+" : ""}${diffCount} chantier${Math.abs(diffCount) > 1 ? "s" : ""}`}
+          {diffAmount !== 0 && ` (${diffAmount > 0 ? "+" : "−"}${euros(Math.abs(diffAmount))})`} par rapport à {prevLabel}
+        </span>
+      )}
     </div>
   );
 }

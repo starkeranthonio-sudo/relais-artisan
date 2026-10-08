@@ -68,6 +68,8 @@ export function LeadDetailPage() {
 
       {stage !== "closed" && !lead.quote && <TransferSection leadId={lead.id} />}
 
+      {lead.quote?.status === "won" && <ReviewSection lead={lead} onChange={reload} />}
+
       {stage !== "closed" && (
         <div className="status-actions">
           {lead.status !== "contacted" && !lead.quote && (
@@ -232,5 +234,54 @@ function TransferSection({ leadId }: { leadId: string }) {
         <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Annuler</button>
       </div>
     </form>
+  );
+}
+
+/** Chantier terminé : demander un avis Google au client (une fois). */
+function ReviewSection({ lead, onChange }: { lead: Lead; onChange: () => void }) {
+  const { api, base } = useApp();
+  const { data: profile } = useLoad(() => api.getProfile(), [api]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function ask() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.requestReview(lead.id);
+      api.track("review_requested", { lead_id: lead.id });
+      onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Envoi impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (lead.review_requested_at) {
+    return (
+      <div className="panel">
+        <h2>Avis Google demandé</h2>
+        <p className="muted small">SMS envoyé au client ({shortDate(lead.review_requested_at)})</p>
+      </div>
+    );
+  }
+  if (lead.opted_out) return null;
+  if (profile && !profile.google_review_url) {
+    return (
+      <div className="panel">
+        <h2>Chantier terminé ?</h2>
+        <p className="muted small">Ajoutez votre lien d'avis Google pour demander un avis à ce client en un clic.</p>
+        <Link className="btn-secondary" to={`${base}/installation`}>Ajouter mon lien Google</Link>
+      </div>
+    );
+  }
+  return (
+    <div className="panel">
+      <h2>Chantier terminé ?</h2>
+      <p className="muted small">Envoyez à {clientLabel(lead)} un SMS de remerciement avec votre lien d'avis Google. Plus d'avis, c'est plus d'appels.</p>
+      {error && <p className="error">{error}</p>}
+      <button className="btn-primary" disabled={busy || !profile} onClick={ask}>{busy ? "Envoi…" : "Demander un avis"}</button>
+    </div>
   );
 }

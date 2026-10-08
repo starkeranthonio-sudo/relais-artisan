@@ -438,3 +438,7 @@ verify_jwt = false
 # Bilan du mois par SMS : appelée par pg_cron, protégée par le secret partagé x-cron-secret.
 [functions.monthly-report]
 verify_jwt = false
+
+# Demande d'avis Google : authentification vérifiée dans la fonction (jeton de l'artisan).
+[functions.review-request]
+verify_jwt = false

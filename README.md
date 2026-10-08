@@ -111,6 +111,12 @@ Le SMS « Nouvelle demande » utilise un lien court `/app/l/<jeton>` (moins de c
 - **Devis à classer** (dans le récap de 18 h) : sans réponse 21 jours après l'envoi, ou client ayant répondu depuis plus de 3 jours.
 - Même interrupteur que le récap (Réglages → SMS de suivi). `pg_cron` : `monthly-report` le 1er, entre 7 h et 8 h UTC.
 
+## Progrès, SMS personnalisé, avis Google ✅
+
+- **Bilan** : comparaison avec le mois précédent (« +1 chantier (+1 150 €) par rapport à septembre ») et badge **Meilleur mois** quand le montant signé dépasse tous les mois précédents.
+- **SMS personnalisé** (Réglages → Votre message aux clients) : `{nom}`, `{lien}` obligatoire, aperçu et compteur en direct. Le serveur revient au texte par défaut si le modèle n'a pas de `{lien}` ou dépasse 1 SMS.
+- **Avis Google** : l'artisan colle son lien (Réglages → Avis Google). Sur un devis gagné, « Chantier terminé ? Demander un avis » envoie au client, au nom de l'artisan, un SMS de remerciement avec le lien. Une seule fois par client, jamais si le client a répondu STOP. Edge Function `review-request`.
+
 ## Mise en route
 
 ### 1. Supabase
@@ -127,6 +133,7 @@ supabase functions deploy quote-followups
 supabase functions deploy lead-transfer
 supabase functions deploy daily-recap
 supabase functions deploy monthly-report
+supabase functions deploy review-request
 ```
 
 ### 2. Twilio
