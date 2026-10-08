@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { supabase } from "../lib/supabase.ts";
 import { supabaseApi } from "./api.ts";
-import { LoginPage, SignupPage } from "./AuthPages.tsx";
+import { LoginPage, SignupPage, WelcomePage } from "./AuthPages.tsx";
 import { AppProvider, useApp } from "./context.tsx";
 import { demoApi } from "./demoApi.ts";
 import { LeadDetailPage } from "./LeadDetailPage.tsx";
@@ -24,6 +24,7 @@ export function ArtisanApp({ demo }: { demo: boolean }) {
       <Routes>
         {!demo && <Route path="connexion" element={<LoginPage />} />}
         {!demo && <Route path="inscription" element={<SignupPage />} />}
+        {!demo && <Route path="bienvenue" element={<RequireSession allowNoProfile><WelcomePage /></RequireSession>} />}
         <Route element={demo ? <Shell /> : <RequireSession><Shell /></RequireSession>}>
           <Route index element={<LeadsPage />} />
           <Route path="demandes/:id" element={<LeadDetailPage />} />
@@ -38,17 +39,29 @@ export function ArtisanApp({ demo }: { demo: boolean }) {
   );
 }
 
-function RequireSession({ children }: { children: React.ReactNode }) {
+function RequireSession({ children, allowNoProfile = false }: { children: React.ReactNode; allowNoProfile?: boolean }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [hasProfile, setHasProfile] = useState<boolean | undefined>(undefined);
   const { pathname } = useLocation();
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => data.subscription.unsubscribe();
   }, []);
+  // Compte Google / Apple sans fiche artisan : on passe d'abord par « Bienvenue ».
+  const userId = session?.user.id;
+  useEffect(() => {
+    if (!userId || allowNoProfile) return;
+    supabaseApi.getProfile().then((p) => setHasProfile(p !== null), () => setHasProfile(true));
+  }, [userId, allowNoProfile]);
+
   if (session === undefined) return <div className="screen-center muted">Chargement…</div>;
   // Après connexion, on revient sur la page demandée (ex. la demande ouverte depuis le SMS).
   if (!session) return <Navigate to={`/app/connexion${pathname !== "/app" ? `?next=${encodeURIComponent(pathname)}` : ""}`} replace />;
+  if (!allowNoProfile) {
+    if (hasProfile === undefined) return <div className="screen-center muted">Chargement…</div>;
+    if (!hasProfile) return <Navigate to={`/app/bienvenue?next=${encodeURIComponent(pathname)}`} replace />;
+  }
   return children;
 }
 

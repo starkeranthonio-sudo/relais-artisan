@@ -40,6 +40,11 @@ export function TransferPage() {
       if (action === "decline") setDeclined(true);
       else navigate(demo ? "/demo/demandes/l1" : `/app/demandes/${leadId}`);
     } catch (e) {
+      // Connecté avec Google / Apple mais fiche artisan pas encore complétée.
+      if (e instanceof TransferError && e.status === 401 && session) {
+        navigate(`/app/bienvenue?next=${encodeURIComponent(`/t/${token}`)}`);
+        return;
+      }
       setError(e instanceof TransferError ? e.message : "Action impossible. Réessayez.");
     } finally {
       setBusy(false);
