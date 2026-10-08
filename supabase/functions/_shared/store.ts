@@ -4,6 +4,7 @@ import type { DueQuote, FollowupStore } from "./followups.ts";
 import type { FormLead, FormStore } from "./request-form.ts";
 import type { MonthlyStore } from "./monthly.ts";
 import type { ReviewArtisan, ReviewLead, ReviewStore } from "./reviews.ts";
+import { MAX_TEST_DRIVES, type TesterArtisan, type TesterStore } from "./testers.ts";
 import { classifyPendingQuotes, parisDate, type RecapArtisan, type RecapStore } from "./recap.ts";
 import type { Transfer, TransferArtisan, TransferLead, TransferStore } from "./transfers.ts";
 import type { Artisan, Lead, Store } from "./types.ts";
@@ -364,6 +365,57 @@ export function supabaseReviewStore(client: SupabaseClient): ReviewStore {
       check(await client.from("leads").update({ review_requested_at: null }).eq("id", leadId));
     },
   };
+}
+
+/** Implémentation Supabase du TesterStore (programme testeurs fondateurs). */
+export function supabaseTesterStore(client: SupabaseClient): TesterStore {
+  return {
+    async claimTestDrive(artisanId) {
+      const { data: row } = await client.from("artisans").select("test_drives_used").eq("id", artisanId).single();
+      const used = (row?.test_drives_used as number | undefined) ?? MAX_TEST_DRIVES;
+      if (used >= MAX_TEST_DRIVES) return false;
+      // Mise à jour conditionnelle : deux clics simultanés ne consomment pas deux fois le même essai.
+      const rows = check(
+        await client.from("artisans").update({ test_drives_used: used + 1 }).eq("id", artisanId).eq("test_drives_used", used).select("id"),
+      );
+      return (rows?.length ?? 0) > 0;
+    },
+    async releaseTestDrive(artisanId) {
+      const { data: row } = await client.from("artisans").select("test_drives_used").eq("id", artisanId).single();
+      const used = (row?.test_drives_used as number | undefined) ?? 0;
+      if (used > 0) check(await client.from("artisans").update({ test_drives_used: used - 1 }).eq("id", artisanId));
+    },
+    async createTestLead(artisanId, clientPhone, token, at) {
+      const row = check(
+        await client.from("leads").insert({
+          artisan_id: artisanId, client_phone: clientPhone, public_token: token, sms_sent_at: at.toISOString(), last_call_at: at.toISOString(),
+        }).select("id").single(),
+      ) as { id: string };
+      return row.id;
+    },
+    async logClientSms(artisanId, leadId, body, sid) {
+      check(await client.from("messages").insert({ artisan_id: artisanId, lead_id: leadId, direction: "outbound_client", body, twilio_sid: sid }));
+    },
+    async saveSiret(artisanId, siret, companyName, at) {
+      const { error } = await client.from("artisans")
+        .update({ siret, siret_company_name: companyName, siret_verified_at: at.toISOString() }).eq("id", artisanId);
+      if (error?.code === "23505") return false; // SIRET déjà rattaché à un autre compte
+      if (error) throw new Error(error.message);
+      return true;
+    },
+  };
+}
+
+/** Artisan connecté avec les champs utiles au programme testeurs. */
+export async function testerFromRequest(client: SupabaseClient, req: Request): Promise<TesterArtisan | null> {
+  const jwt = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!jwt) return null;
+  const { data, error } = await client.auth.getUser(jwt);
+  if (error || !data.user) return null;
+  return check(
+    await client.from("artisans").select("id, business_name, owner_phone, relay_number, sms_sender, client_sms_template, siret")
+      .eq("user_id", data.user.id).maybeSingle(),
+  ) as TesterArtisan | null;
 }
 
 /** Artisan connecté avec les champs utiles à la demande d'avis. */

@@ -442,3 +442,7 @@ verify_jwt = false
 # Demande d'avis Google : authentification vérifiée dans la fonction (jeton de l'artisan).
 [functions.review-request]
 verify_jwt = false
+
+# Outils de l'artisan (essai, SIRET) : authentification vérifiée dans la fonction.
+[functions.artisan-tools]
+verify_jwt = false

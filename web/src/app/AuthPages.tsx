@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { supabase } from "../lib/supabase.ts";
 import { toE164 } from "./format.ts";
+import { TRADES } from "./founders.ts";
 
 /** Page où revenir après connexion (seulement un chemin interne, jamais un autre site). */
 function useNext(fallback: string): string {
@@ -116,6 +117,8 @@ export function SignupPage() {
   const referralCode = params.get("parrain") ?? undefined;
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
+  const [trade, setTrade] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +130,8 @@ export function SignupPage() {
     const ownerPhone = toE164(phone);
     if (businessName.trim().length < 2) return setError("Indiquez le nom de votre entreprise.");
     if (!ownerPhone) return setError("Numéro de portable invalide (ex. : 06 12 34 56 78).");
+    if (!trade) return setError("Choisissez votre métier.");
+    if (!/^\d{5}$/.test(postalCode)) return setError("Code postal : 5 chiffres.");
     if (password.length < 8) return setError("Mot de passe : 8 caractères minimum.");
     setBusy(true);
     setError(null);
@@ -134,7 +139,7 @@ export function SignupPage() {
       email: email.trim(),
       password,
       options: {
-        data: { business_name: businessName.trim(), owner_phone: ownerPhone, referral_code: referralCode },
+        data: { business_name: businessName.trim(), owner_phone: ownerPhone, referral_code: referralCode, trade, postal_code: postalCode },
         emailRedirectTo: `${window.location.origin}${next}`,
       },
     });
@@ -166,6 +171,19 @@ export function SignupPage() {
           <input type="tel" autoComplete="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" />
           <span className="hint">Vous y recevrez les nouvelles demandes par SMS.</span>
         </label>
+        <div className="field-row">
+          <label className="field">
+            <span className="label">Métier</span>
+            <select value={trade} onChange={(e) => setTrade(e.target.value)}>
+              <option value="">Choisir…</option>
+              {TRADES.map((t) => <option key={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span className="label">Code postal</span>
+            <input type="text" inputMode="numeric" autoComplete="postal-code" maxLength={5} value={postalCode} onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, ""))} placeholder="78140" />
+          </label>
+        </div>
         <label className="field">
           <span className="label">Email</span>
           <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -192,6 +210,8 @@ export function WelcomePage() {
   const next = useNext("/app/installation");
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
+  const [trade, setTrade] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -200,6 +220,8 @@ export function WelcomePage() {
     const ownerPhone = toE164(phone);
     if (businessName.trim().length < 2) return setError("Indiquez le nom de votre entreprise.");
     if (!ownerPhone) return setError("Numéro de portable invalide (ex. : 06 12 34 56 78).");
+    if (!trade) return setError("Choisissez votre métier.");
+    if (!/^\d{5}$/.test(postalCode)) return setError("Code postal : 5 chiffres.");
     let referralCode: string | null = null;
     try {
       referralCode = localStorage.getItem(REFERRAL_STORAGE_KEY);
@@ -212,6 +234,8 @@ export function WelcomePage() {
       p_business_name: businessName.trim(),
       p_owner_phone: ownerPhone,
       p_referral_code: referralCode,
+      p_trade: trade,
+      p_postal_code: postalCode,
     });
     setBusy(false);
     if (error) return setError("Enregistrement impossible. Vérifiez les informations et réessayez.");
@@ -224,7 +248,7 @@ export function WelcomePage() {
   }
 
   return (
-    <AuthLayout title="Bienvenue" lead="Deux informations et c'est terminé.">
+    <AuthLayout title="Bienvenue" lead="Quelques informations et c'est terminé.">
       <form className="stack" onSubmit={onSubmit} noValidate>
         <label className="field">
           <span className="label">Nom de l'entreprise</span>
@@ -236,6 +260,19 @@ export function WelcomePage() {
           <input type="tel" autoComplete="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" />
           <span className="hint">Vous y recevrez les nouvelles demandes par SMS.</span>
         </label>
+        <div className="field-row">
+          <label className="field">
+            <span className="label">Métier</span>
+            <select value={trade} onChange={(e) => setTrade(e.target.value)}>
+              <option value="">Choisir…</option>
+              {TRADES.map((t) => <option key={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span className="label">Code postal</span>
+            <input type="text" inputMode="numeric" autoComplete="postal-code" maxLength={5} value={postalCode} onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, ""))} placeholder="78140" />
+          </label>
+        </div>
         {error && <p className="error" role="alert">{error}</p>}
         <button className="btn-primary" disabled={busy}>{busy ? "Enregistrement…" : "Continuer"}</button>
       </form>

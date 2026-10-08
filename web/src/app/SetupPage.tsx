@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useApp, useLoad } from "./context.tsx";
 import { formatPhone, nationalDigits, toE164 } from "./format.ts";
 import { checkTemplate, DEFAULT_CLIENT_SMS, renderClientSms, toGsm7 } from "./smsTemplate.ts";
+import { currentTier, INVITEE_REWARD, nextTier, TIERS } from "./founders.ts";
 import type { Profile } from "./types.ts";
 
 /** Règles des opérateurs pour un expéditeur SMS alphanumérique. */
@@ -27,11 +28,12 @@ export function SetupPage() {
         <h1>Installation</h1>
         <p className="lead">3 minutes, une seule fois. Ensuite, chaque appel manqué est récupéré automatiquement.</p>
       </header>
+      <TestDrive profile={profile} onDone={reload} />
       {profile.relay_number ? <Steps relay={profile.relay_number} /> : <Pending />}
       <SmsTemplateEditor profile={profile} onSaved={reload} />
       <GoogleReviewLink profile={profile} onSaved={reload} />
       <RecapToggle enabled={profile.daily_recap} onChange={reload} />
-      <Referral code={profile.referral_code} businessName={profile.business_name} />
+      <Referral profile={profile} onChange={reload} />
       <ProfileForm profile={profile} onSaved={reload} />
       <SignOut />
     </section>
@@ -41,8 +43,8 @@ export function SetupPage() {
 function Pending() {
   return (
     <div className="panel">
-      <h2>Votre numéro relais est en préparation</h2>
-      <p className="muted">Nous activons votre numéro dédié sous 24 h ouvrées. Vous recevrez un SMS dès qu'il est prêt, avec le code à taper pour l'activer.</p>
+      <h2>Votre numéro relais</h2>
+      <p className="muted small">Vous êtes testeur fondateur : votre numéro dédié vous sera attribué à l'ouverture commerciale. Vous recevrez un SMS avec le code à taper pour l'activer (3 minutes).</p>
     </div>
   );
 }
@@ -158,13 +160,16 @@ function SignOut() {
   );
 }
 
-/** Parrainage : 1 mois offert pour l'artisan et pour chaque confrère qui s'inscrit avec son lien. */
-function Referral({ code, businessName }: { code: string; businessName: string }) {
+/** Programme testeurs fondateurs : SIRET vérifié, paliers de parrainage, partage du lien. */
+function Referral({ profile, onChange }: { profile: Profile; onChange: () => void }) {
   const { api } = useApp();
   const { data: referrals } = useLoad(() => api.referrals(), [api]);
   const [copied, setCopied] = useState(false);
-  const link = `${window.location.origin}/app/inscription?parrain=${code}`;
-  const message = `Je récupère mes appels manqués et mes devis sont relancés tout seuls avec Relais Artisan. Inscris-toi avec mon lien, on a chacun 1 mois offert : ${link}`;
+  const link = `${window.location.origin}/testeurs?parrain=${profile.referral_code}`;
+  const message = `Je teste Relais Artisan : mes appels manqués deviennent des demandes claires et mes devis sont relancés tout seuls. Inscris-toi comme testeur avec mon lien, tu auras ${INVITEE_REWARD} : ${link}`;
+  const verified = referrals?.verified ?? 0;
+  const reached = currentTier(verified);
+  const next = nextTier(verified);
 
   async function share() {
     api.track("referral_share", { channel: "share" in navigator ? "share" : "copy" });
@@ -173,7 +178,7 @@ function Referral({ code, businessName }: { code: string; businessName: string }
         await navigator.share({ title: "Relais Artisan", text: message });
         return;
       } catch {
-        /* partage annulé : on copie le lien */
+        /* partage annulé : on copie le message */
       }
     }
     try {
@@ -185,22 +190,121 @@ function Referral({ code, businessName }: { code: string; businessName: string }
     }
   }
 
-  const count = referrals?.names.length ?? 0;
   return (
     <div className="panel stack">
       <div>
-        <h2>Parrainez un confrère</h2>
-        <p className="muted small">1 mois offert pour vous et 1 mois pour lui, à chaque confrère qui s'inscrit avec votre lien.</p>
+        <p className="eyebrow">Testeurs fondateurs</p>
+        <h2>Invitez vos confrères</h2>
+        <p className="muted small">Chaque confrère du bâtiment qui s'inscrit avec votre lien vous rapproche du palier suivant, et il reçoit {INVITEE_REWARD}.</p>
       </div>
-      {count > 0 && (
-        <p>
-          <strong className="accent">{count} confrère{count > 1 ? "s" : ""} parrainé{count > 1 ? "s" : ""}</strong>
-          <span className="muted"> · {referrals!.names.join(", ")}</span>
-        </p>
+
+      <ol className="tiers">
+        {TIERS.map((t) => (
+          <li key={t.referrals} className={verified >= t.referrals ? "done" : next === t ? "next" : ""}>
+            <span className="tier-count">{t.referrals}</span>
+            <span><strong>{t.title}</strong><span className="muted small"> · {t.detail}</span></span>
+          </li>
+        ))}
+      </ol>
+      <p className="small">
+        <strong className="accent">{verified} confrère{verified > 1 ? "s" : ""} vérifié{verified > 1 ? "s" : ""}</strong>
+        {reached && <span className="muted"> · palier atteint : {reached.title}</span>}
+        {next && <span className="muted"> · encore {next.referrals - verified} pour « {next.title} »</span>}
+      </p>
+      {referrals && referrals.names.length > verified && (
+        <p className="muted small">{referrals.names.length - verified} confrère(s) inscrit(s) en attente de vérification de leur SIRET.</p>
       )}
-      <button className="btn-primary" onClick={share}>{copied ? "Message copié" : "Envoyer mon lien"}</button>
-      <a className="btn-secondary" href={`sms:?&body=${encodeURIComponent(message)}`} onClick={() => api.track("referral_share", { channel: "sms" })}>Par SMS</a>
-      <p className="muted small">Votre code : <code>{code}</code> · signé {businessName}</p>
+
+      <div className="actions-2">
+        <button className="btn-primary" onClick={share}>{copied ? "Message copié" : "Partager"}</button>
+        <a className="btn-secondary" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" onClick={() => api.track("referral_share", { channel: "whatsapp" })}>WhatsApp</a>
+      </div>
+      <a className="btn-ghost" href={`sms:?&body=${encodeURIComponent(message)}`} onClick={() => api.track("referral_share", { channel: "sms" })}>Envoyer par SMS</a>
+
+      <SiretBlock profile={profile} onChange={onChange} />
+      <p className="muted small">Avantages valables à l'ouverture commerciale. <a href="/testeurs#conditions" target="_blank" rel="noreferrer">Conditions du programme</a></p>
+    </div>
+  );
+}
+
+/** SIRET : seuls les comptes vérifiés comptent dans les paliers de leur parrain. */
+function SiretBlock({ profile, onChange }: { profile: Profile; onChange: () => void }) {
+  const { api } = useApp();
+  const [siret, setSiret] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  if (profile.siret_verified_at) {
+    return <p className="success small">SIRET vérifié · {profile.siret_company_name}</p>;
+  }
+
+  async function verify(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { companyName } = await api.verifySiret(siret);
+      api.track("siret_verified");
+      setMsg({ ok: true, text: `Vérifié : ${companyName}` });
+      onChange();
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : "Vérification impossible." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="siret" onSubmit={verify}>
+      <label className="field">
+        <span className="label">Votre SIRET <span className="optional">pour que votre compte compte chez votre parrain</span></span>
+        <input type="text" inputMode="numeric" value={siret} onChange={(e) => setSiret(e.target.value.replace(/[^\d ]/g, ""))} placeholder="123 456 789 00012" maxLength={17} />
+      </label>
+      {msg && <p className={msg.ok ? "success" : "error"}>{msg.text}</p>}
+      <button className="btn-secondary" disabled={busy || siret.replace(/\s/g, "").length !== 14}>{busy ? "Vérification…" : "Vérifier"}</button>
+    </form>
+  );
+}
+
+/** Essai : simule un appel manqué pour vivre le vrai parcours sur son propre téléphone. */
+function TestDrive({ profile, onDone }: { profile: Profile; onDone: () => void }) {
+  const { api } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const left = Math.max(0, 3 - profile.test_drives_used);
+
+  async function go() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.testDrive();
+      api.track("test_drive", { n: profile.test_drives_used + 1 });
+      setSent(true);
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Essai impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="panel stack test-drive">
+      <div>
+        <p className="eyebrow">Essai</p>
+        <h2>Vivez-le sur votre téléphone</h2>
+        <p className="muted small">On simule un appel manqué. Vous recevez le SMS que recevraient vos clients, à votre nom. Remplissez la demande comme un client : 1 minute après, vous recevez « Nouvelle demande » et elle s'affiche ici.</p>
+      </div>
+      {sent ? (
+        <p className="success">SMS envoyé au {formatPhone(profile.owner_phone)}. Ouvrez-le et touchez le lien.</p>
+      ) : (
+        <button className="btn-primary" onClick={go} disabled={busy || left === 0}>
+          {busy ? "Envoi…" : left === 0 ? "Essais utilisés" : "Faire l'essai"}
+        </button>
+      )}
+      {error && <p className="error">{error}</p>}
+      <p className="muted small">{left} essai{left > 1 ? "s" : ""} restant{left > 1 ? "s" : ""}.</p>
     </div>
   );
 }

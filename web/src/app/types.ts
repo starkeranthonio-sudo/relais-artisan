@@ -13,6 +13,12 @@ export interface Profile {
   daily_recap: boolean;
   client_sms_template: string | null;
   google_review_url: string | null;
+  trade: string | null;
+  postal_code: string | null;
+  siret: string | null;
+  siret_company_name: string | null;
+  siret_verified_at: string | null;
+  test_drives_used: number;
 }
 
 export interface OutgoingTransfer {
@@ -24,6 +30,8 @@ export interface OutgoingTransfer {
 
 export interface Referrals {
   names: string[];
+  /** Parrainages comptés pour les paliers (SIRET du confrère vérifié). */
+  verified: number;
 }
 
 export interface Quote {
@@ -75,7 +83,7 @@ export interface MonthStats {
 
 export type EventName =
   | "app_open" | "lead_view" | "lead_call" | "lead_sms" | "quote_declared" | "quote_won" | "quote_lost"
-  | "transfer_sent" | "referral_share" | "stats_view" | "sms_template_saved" | "review_requested";
+  | "transfer_sent" | "referral_share" | "stats_view" | "sms_template_saved" | "review_requested" | "test_drive" | "siret_verified";
 
 export interface ArtisanApi {
   readonly demo: boolean;
@@ -96,6 +104,10 @@ export interface ArtisanApi {
   referrals(): Promise<Referrals>;
   /** Envoie au client la demande d'avis Google (chantier terminé). */
   requestReview(leadId: string): Promise<void>;
+  /** Essai : simule un appel manqué sur le portable de l'artisan. */
+  testDrive(): Promise<void>;
+  /** Vérifie le SIRET dans la base Sirene ; renvoie le nom officiel de l'entreprise. */
+  verifySiret(siret: string): Promise<{ companyName: string }>;
   /** Montant gagné par mois (« AAAA-MM » → centimes), pour comparer les mois entre eux. */
   wonByMonth(): Promise<Record<string, number>>;
   /** Identifiant d'une demande à partir du jeton court du lien SMS (/app/l/<jeton>). */

@@ -17,6 +17,24 @@ const LEAD_COLUMNS =
   "id, client_phone, client_name, work_type, description, address, urgency, photo_paths, ai_summary, status, " +
   "call_count, created_at, last_call_at, form_submitted_at, replied_at, opted_out, review_requested_at, quote:quotes(*)";
 
+/** Appel d'une Edge Function avec la session de l'artisan ; lève une Error avec le message serveur en français. */
+async function callFunction<T = unknown>(name: string, body: Record<string, unknown>): Promise<T> {
+  const base = (import.meta.env.VITE_FUNCTIONS_URL as string).replace(/\/$/, "");
+  const { data } = await supabase.auth.getSession();
+  const res = await fetch(`${base}/${name}`, {
+    method: "POST",
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+      "Content-Type": "application/json",
+      ...(data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error ?? "Action impossible. Réessayez.");
+  return json as T;
+}
+
 function ok<T>({ data, error }: { data: T; error: { message: string } | null }): T {
   if (error) throw new Error(error.message);
   return data;
@@ -37,7 +55,7 @@ export const supabaseApi: ArtisanApi = {
   demo: false,
 
   async getProfile() {
-    return ok(await supabase.from("artisans").select("id, business_name, owner_phone, relay_number, referral_code, sms_sender, daily_recap, client_sms_template, google_review_url").maybeSingle());
+    return ok(await supabase.from("artisans").select("id, business_name, owner_phone, relay_number, referral_code, sms_sender, daily_recap, client_sms_template, google_review_url, trade, postal_code, siret, siret_company_name, siret_verified_at, test_drives_used").maybeSingle());
   },
 
   async updateProfile(patch) {
@@ -123,23 +141,23 @@ export const supabaseApi: ArtisanApi = {
   },
 
   async referrals() {
-    const rows = ok(await supabase.from("my_referrals").select("business_name").order("created_at"));
-    return { names: (rows ?? []).map((r) => r.business_name as string) };
+    const rows = ok(await supabase.from("my_referrals").select("business_name, verified").order("created_at"));
+    return {
+      names: (rows ?? []).map((r) => r.business_name as string),
+      verified: (rows ?? []).filter((r) => r.verified).length,
+    };
   },
 
   async requestReview(leadId) {
-    const FUNCTIONS = (import.meta.env.VITE_FUNCTIONS_URL as string).replace(/\/$/, "");
-    const { data } = await supabase.auth.getSession();
-    const res = await fetch(`${FUNCTIONS}/review-request`, {
-      method: "POST",
-      headers: {
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-        "Content-Type": "application/json",
-        ...(data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}),
-      },
-      body: JSON.stringify({ leadId }),
-    });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Envoi impossible.");
+    await callFunction("review-request", { leadId });
+  },
+
+  async testDrive() {
+    await callFunction("artisan-tools", { action: "test_drive" });
+  },
+
+  async verifySiret(siret) {
+    return callFunction<{ companyName: string }>("artisan-tools", { action: "verify_siret", siret });
   },
 
   async wonByMonth() {

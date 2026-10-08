@@ -11,7 +11,8 @@ const inMs = (ms: number) => new Date(Date.now() + ms).toISOString();
 
 const profile: Profile = {
   id: "demo", business_name: "Dupont Plomberie", owner_phone: "+33612345678", relay_number: "+33939012345", referral_code: "demo123", sms_sender: "DupontPlomb", daily_recap: true, client_sms_template: null,
-  google_review_url: "https://g.page/r/demo/review",
+  google_review_url: "https://g.page/r/demo/review", trade: "Plombier", postal_code: "78140",
+  siret: null, siret_company_name: null, siret_verified_at: null, test_drives_used: 1,
 };
 const transfers = new Map<string, OutgoingTransfer>();
 
@@ -130,7 +131,15 @@ export const demoApi: ArtisanApi = {
     return { inviteeWasMember: false };
   },
   outgoingTransfer: async (leadId) => transfers.get(leadId) ?? null,
-  referrals: async () => ({ names: ["Martin Électricité", "Leroy Chauffage"] }),
+  referrals: async () => ({ names: ["Martin Électricité", "Leroy Chauffage"], verified: 2 }),
+  testDrive: async () => {
+    profile.test_drives_used += 1;
+  },
+  verifySiret: async (siret) => {
+    if (siret.replace(/\s/g, "") !== "92759307900050") throw new Error("En démonstration, essayez le SIRET 927 593 079 00050.");
+    Object.assign(profile, { siret: "92759307900050", siret_company_name: "AZUR PLOMBERIE", siret_verified_at: new Date().toISOString() });
+    return { companyName: "AZUR PLOMBERIE" };
+  },
   leadIdByToken: async () => "l1",
   requestReview: async (leadId) => {
     find(leadId)!.review_requested_at = new Date().toISOString();

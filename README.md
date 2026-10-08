@@ -117,6 +117,14 @@ Le SMS « Nouvelle demande » utilise un lien court `/app/l/<jeton>` (moins de c
 - **SMS personnalisé** (Réglages → Votre message aux clients) : `{nom}`, `{lien}` obligatoire, aperçu et compteur en direct. Le serveur revient au texte par défaut si le modèle n'a pas de `{lien}` ou dépasse 1 SMS.
 - **Avis Google** : l'artisan colle son lien (Réglages → Avis Google). Sur un devis gagné, « Chantier terminé ? Demander un avis » envoie au client, au nom de l'artisan, un SMS de remerciement avec le lien. Une seule fois par client, jamais si le client a répondu STOP. Edge Function `review-request`.
 
+## Programme « Testeurs fondateurs » ✅
+
+- Page publique **/testeurs** (cible des liens de parrainage `/testeurs?parrain=<code>`) : promesse, fonctionnement, paliers, conditions écrites.
+- Inscription avec **métier** et **code postal** (email ou Google/Apple via « Bienvenue »).
+- **Essai** (Réglages → « Faire l'essai », 3 max) : simule un appel manqué ; l'artisan reçoit le SMS client à son nom, remplit la demande, reçoit « Nouvelle demande ». Edge Function `artisan-tools` (`test_drive`).
+- **SIRET facultatif**, vérifié dans la base Sirene (API Recherche d'entreprises : établissement actif, section F construction, clé de Luhn, 1 compte par SIRET). Seuls les filleuls vérifiés comptent dans les paliers 1 / 3 / 5 / 10.
+- Suivi de la validation : `select * from analytics_validation;` (inscrits, essais, SIRET vérifiés, parrainages).
+
 ## Mise en route
 
 ### 1. Supabase
@@ -134,6 +142,7 @@ supabase functions deploy lead-transfer
 supabase functions deploy daily-recap
 supabase functions deploy monthly-report
 supabase functions deploy review-request
+supabase functions deploy artisan-tools
 ```
 
 ### 2. Twilio
