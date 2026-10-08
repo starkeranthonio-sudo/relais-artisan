@@ -1,6 +1,8 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { formatFrench } from "./phone.ts";
 import type { DueQuote, FollowupStore } from "./followups.ts";
 import type { FormLead, FormStore } from "./request-form.ts";
+import type { RecapArtisan, RecapStore } from "./recap.ts";
 import type { Transfer, TransferArtisan, TransferLead, TransferStore } from "./transfers.ts";
 import type { Artisan, Lead, Store } from "./types.ts";
 
@@ -240,6 +242,48 @@ export function supabaseTransferStore(client: SupabaseClient): TransferStore {
 
     async setReferrer(artisanId, referrerId) {
       check(await client.from("artisans").update({ referred_by: referrerId }).eq("id", artisanId).is("referred_by", null));
+    },
+  };
+}
+
+/** Implémentation Supabase du RecapStore (SMS de 18 h). */
+export function supabaseRecapStore(client: SupabaseClient): RecapStore {
+  return {
+    async candidates(today) {
+      return check(
+        await client.from("artisans").select("id, owner_phone, relay_number")
+          .eq("daily_recap", true).not("user_id", "is", null).not("relay_number", "is", null)
+          .or(`last_recap_on.is.null,last_recap_on.lt.${today}`),
+      ) as RecapArtisan[];
+    },
+
+    async content(artisanId) {
+      // Clients ayant rempli leur demande, pas encore rappelés ni classés, sans devis.
+      const leads = check(
+        await client.from("leads").select("client_name, client_phone, quotes(id)")
+          .eq("artisan_id", artisanId).eq("status", "form_submitted")
+          .order("form_submitted_at", { ascending: false }).limit(50),
+      ) as { client_name: string | null; client_phone: string; quotes: unknown }[];
+      const toCall = leads
+        .filter((l) => !(Array.isArray(l.quotes) ? l.quotes.length : l.quotes))
+        .map((l) => l.client_name?.trim() || formatFrench(l.client_phone));
+
+      const quotes = check(
+        await client.from("quotes").select("stop_reason").eq("artisan_id", artisanId).eq("status", "pending"),
+      ) as { stop_reason: string | null }[];
+      return {
+        toCall,
+        repliedQuotes: quotes.filter((q) => q.stop_reason === "client_replied").length,
+        quotesToClose: quotes.filter((q) => q.stop_reason === "completed").length,
+      };
+    },
+
+    async claim(artisanId, today) {
+      const rows = check(
+        await client.from("artisans").update({ last_recap_on: today })
+          .eq("id", artisanId).or(`last_recap_on.is.null,last_recap_on.lt.${today}`).select("id"),
+      );
+      return (rows?.length ?? 0) > 0;
     },
   };
 }

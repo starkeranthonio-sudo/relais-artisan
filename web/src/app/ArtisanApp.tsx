@@ -29,6 +29,7 @@ export function ArtisanApp({ demo }: { demo: boolean }) {
           <Route index element={<LeadsPage />} />
           <Route path="demandes/:id" element={<LeadDetailPage />} />
           <Route path="l/:token" element={<LeadFromSms />} />
+          <Route path="r" element={<Navigate to={base} replace />} />
           <Route path="devis" element={<QuotesPage />} />
           <Route path="bilan" element={<StatsPage />} />
           <Route path="installation" element={<SetupPage />} />
@@ -89,7 +90,7 @@ function Shell() {
   const { pathname } = useLocation();
 
   // Une ouverture par chargement de l'espace artisan ; « sms » si on arrive par le lien du SMS (déclencheur externe).
-  const [openedFrom] = useState(() => (pathname.includes("/l/") ? "sms" : "direct"));
+  const [openedFrom] = useState(() => (pathname.includes("/l/") ? "sms" : /\/r\/?$/.test(pathname) ? "recap" : "direct"));
   useEffect(() => {
     api.track("app_open", { source: openedFrom });
   }, [api, openedFrom]);

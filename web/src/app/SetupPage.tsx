@@ -27,6 +27,7 @@ export function SetupPage() {
         <p className="lead">3 minutes, une seule fois. Ensuite, chaque appel manqué est récupéré automatiquement.</p>
       </header>
       {profile.relay_number ? <Steps relay={profile.relay_number} /> : <Pending />}
+      <RecapToggle enabled={profile.daily_recap} onChange={reload} />
       <Referral code={profile.referral_code} businessName={profile.business_name} />
       <ProfileForm profile={profile} onSaved={reload} />
       <SignOut />
@@ -197,6 +198,44 @@ function Referral({ code, businessName }: { code: string; businessName: string }
       <button className="btn-primary" onClick={share}>{copied ? "Message copié" : "Envoyer mon lien"}</button>
       <a className="btn-secondary" href={`sms:?&body=${encodeURIComponent(message)}`} onClick={() => api.track("referral_share", { channel: "sms" })}>Par SMS</a>
       <p className="muted small">Votre code : <code>{code}</code> · signé {businessName}</p>
+    </div>
+  );
+}
+
+/** SMS récapitulatif de 18 h : activé par défaut, désactivable. */
+function RecapToggle({ enabled, onChange }: { enabled: boolean; onChange: () => void }) {
+  const { api } = useApp();
+  const [on, setOn] = useState(enabled);
+  const [busy, setBusy] = useState(false);
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      await api.updateProfile({ daily_recap: !on });
+      setOn(!on);
+      onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="panel toggle-row">
+      <div>
+        <h2>Récapitulatif du soir</h2>
+        <p className="muted small">Un SMS vers 18 h, du lundi au samedi, seulement s'il y a des clients à rappeler ou des devis à suivre.</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="Récapitulatif du soir"
+        className={`switch${on ? " on" : ""}`}
+        disabled={busy}
+        onClick={toggle}
+      >
+        <span />
+      </button>
     </div>
   );
 }

@@ -37,7 +37,7 @@ export const supabaseApi: ArtisanApi = {
   demo: false,
 
   async getProfile() {
-    return ok(await supabase.from("artisans").select("id, business_name, owner_phone, relay_number, referral_code, sms_sender").maybeSingle());
+    return ok(await supabase.from("artisans").select("id, business_name, owner_phone, relay_number, referral_code, sms_sender, daily_recap").maybeSingle());
   },
 
   async updateProfile(patch) {

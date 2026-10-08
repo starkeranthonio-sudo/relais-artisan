@@ -430,3 +430,7 @@ verify_jwt = false
 # Transmission entre artisans : aperçu public par jeton ; actions authentifiées vérifiées dans la fonction.
 [functions.lead-transfer]
 verify_jwt = false
+
+# SMS récapitulatif de 18 h : appelée par pg_cron, protégée par le secret partagé x-cron-secret.
+[functions.daily-recap]
+verify_jwt = false

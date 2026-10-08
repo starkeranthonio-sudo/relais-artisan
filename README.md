@@ -97,6 +97,13 @@ select * from analytics_funnel;        -- par semaine : fiches ouvertes → appe
 
 Le SMS « Nouvelle demande » utilise un lien court `/app/l/<jeton>` (moins de caractères, ouverture comptée « depuis un SMS »). Un artisan non connecté revient sur la demande après connexion.
 
+## SMS récapitulatif de 18 h ✅
+
+- Du lundi au samedi entre 18 h et 19 h (heure de Paris), un SMS « RelaisArt » à l'artisan : clients à rappeler (2 noms max), réponses aux devis, devis à classer. Exemple : *Ce soir : 3 clients à rappeler (Marie, M. Leroy…), 1 réponse à vos devis, 2 devis à classer. Voir : …/app/r*
+- **Rien à faire → pas de SMS.** Un seul récap par jour (`artisans.last_recap_on`, marqué seulement quand un SMS part).
+- Désactivable dans Réglages (`artisans.daily_recap`). Ouverture depuis le récap mesurée (`app_open`, `source = recap`).
+- `pg_cron` appelle `daily-recap` toutes les 15 min entre 15 h et 18 h UTC (couvre l'heure d'été et d'hiver).
+
 ## Mise en route
 
 ### 1. Supabase
@@ -111,6 +118,7 @@ supabase functions deploy twilio-sms
 supabase functions deploy request-form
 supabase functions deploy quote-followups
 supabase functions deploy lead-transfer
+supabase functions deploy daily-recap
 ```
 
 ### 2. Twilio

@@ -10,6 +10,7 @@ export interface Profile {
   relay_number: string | null;
   referral_code: string;
   sms_sender: string;
+  daily_recap: boolean;
 }
 
 export interface OutgoingTransfer {
@@ -76,7 +77,7 @@ export type EventName =
 export interface ArtisanApi {
   readonly demo: boolean;
   getProfile(): Promise<Profile | null>;
-  updateProfile(patch: Pick<Profile, "business_name" | "owner_phone" | "sms_sender">): Promise<void>;
+  updateProfile(patch: Partial<Pick<Profile, "business_name" | "owner_phone" | "sms_sender" | "daily_recap">>): Promise<void>;
   listLeads(): Promise<Lead[]>;
   getLead(id: string): Promise<Lead | null>;
   photoUrls(paths: string[]): Promise<string[]>;
