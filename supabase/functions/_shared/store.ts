@@ -468,6 +468,18 @@ export function supabaseProgramStore(client: SupabaseClient): ProgramStore {
     async logFunnel(testerId, step, sessionId, props = {}) {
       check(await client.from("funnel_events").insert({ tester_id: testerId, step, session_id: sessionId ?? `tester-${testerId}`, props }));
     },
+    async deleteTester(testerId) {
+      const t = check(await client.from("testers").select("artisan_id").eq("id", testerId).single()) as { artisan_id: string };
+      // Fichiers d'abord (photos de devis, photos de la demande d'essai), puis la fiche : la base supprime le reste en cascade.
+      const { data: proofs } = await client.storage.from("siret-proofs").list(testerId);
+      if (proofs?.length) await client.storage.from("siret-proofs").remove(proofs.map((f) => `${testerId}/${f.name}`));
+      const leads = check(await client.from("leads").select("id, photo_paths").eq("artisan_id", t.artisan_id)) as { id: string; photo_paths: string[] }[];
+      const photos = leads.flatMap((l) => l.photo_paths ?? []);
+      if (photos.length) await client.storage.from("lead-photos").remove(photos);
+      // Étapes de l'entonnoir rattachées au testeur : on garde l'étape, on retire le lien et les infos.
+      check(await client.from("funnel_events").update({ tester_id: null, session_id: "supprime", props: {} }).eq("tester_id", testerId));
+      check(await client.from("artisans").delete().eq("id", t.artisan_id));
+    },
   };
 }
 

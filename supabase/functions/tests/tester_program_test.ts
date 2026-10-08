@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
-  checkSiret, complete, getState, personalLinkSms, type ProgramDeps, referralLinkSms, thankYouSms, type ProgramStore, register, sendProof, skipSiret, type Tester, testDrive,
+  checkSiret, complete, deleteTester, getState, personalLinkSms, type ProgramDeps, referralLinkSms, thankYouSms, type ProgramStore, register, sendProof, skipSiret, type Tester, testDrive,
 } from "../_shared/tester-program.ts";
 import type { TesterDeps } from "../_shared/testers.ts";
 import { isGsm7, toGsm7 } from "../_shared/twilio.ts";
@@ -36,6 +36,7 @@ function setup() {
     },
     uploadProof: (path) => (proofs.push(path), Promise.resolve()),
     logFunnel: (tester, step, session) => (funnel.push({ tester, step, session }), Promise.resolve()),
+    deleteTester: (id) => (testers.splice(testers.findIndex((t) => t.id === id), 1), Promise.resolve()),
   };
   const testerDeps: TesterDeps = {
     store: {
@@ -172,4 +173,13 @@ Deno.test("SMS RelaisArti : chacun tient en 1 SMS GSM-7", () => {
     assert(isGsm7(g));
     assert(g.length <= 160, `${g.length} : ${g}`);
   }
+});
+
+Deno.test("suppression des données : le lien ne fonctionne plus ensuite", async () => {
+  const { deps, testers } = setup();
+  await register(INFO, deps);
+  assert((await deleteTester("tok1", deps)).ok);
+  assertEquals(testers.length, 0);
+  assertEquals((await getState("tok1", deps)).ok, false);
+  assertEquals((await deleteTester("tok1", deps)).ok, false);
 });

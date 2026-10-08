@@ -137,7 +137,10 @@ select * from analytics_testers_funnel;   -- où les gens s'arrêtent (visiteurs
 select * from analytics_testers;          -- chaque testeur : avancement, filleuls, clics sur son lien
 select * from admin_siret_pending;        -- photos de devis à vérifier (bucket Storage « siret-proofs »)
 select public.admin_validate_siret('<tester_id>', true, 'NOM OFFICIEL');  -- valider (false = refuser)
+select * from launch_contacts;            -- testeurs à prévenir à l'ouverture (exporter en CSV)
 ```
+
+RGPD : chaque testeur peut supprimer toutes ses données depuis son espace (« Supprimer mes données ») : fiche, demande d'essai, messages, photos ; l'entonnoir ne garde que des étapes anonymes. Texte « Vos données » dans les conditions (collecte, finalités, durée : 12 mois après l'ouverture hors clients, droits).
 
 ## Mise en route
 

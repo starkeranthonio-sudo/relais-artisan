@@ -151,7 +151,7 @@ function InfoStep({ referral, onBack }: { referral: string | null; onBack: () =>
       {error && <p className="error" role="alert">{error}</p>}
       <button className="btn-primary cta" disabled={busy}>{busy ? "Inscription…" : "Suivant"}</button>
       <button type="button" className="btn-ghost" onClick={onBack}>Retour</button>
-      <p className="muted small">Vos informations servent uniquement au programme de test RelaisArti. Vous pouvez demander leur suppression à tout moment.</p>
+      <p className="muted small">Vos informations servent uniquement au programme de test RelaisArti et à vous prévenir de l'ouverture. Vous pourrez les supprimer à tout moment depuis votre espace testeur.</p>
     </form>
   );
 }
@@ -163,6 +163,7 @@ export function TesterSpace() {
   const [state, setState] = useState<TesterState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<1 | 2 | 3 | null>(null);
+  const [deleted, setDeleted] = useState(false);
 
   const reload = () =>
     testerApi.state(token).then((s) => {
@@ -178,6 +179,15 @@ export function TesterSpace() {
       .catch((e) => setError(e instanceof TesterError ? e.message : "Page indisponible."));
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (deleted) {
+    return (
+      <main className="founders">
+        <p className="eyebrow">RelaisArti</p>
+        <h1>Vos données ont été supprimées</h1>
+        <p className="lead">Merci d'avoir testé RelaisArti.</p>
+      </main>
+    );
+  }
   if (error) return <main className="founders"><h1>Lien invalide</h1><p className="lead">{error}</p><Link to="/testeurs">S'inscrire</Link></main>;
   if (!state || !step) return <main className="founders"><p className="muted">Chargement…</p></main>;
 
@@ -188,6 +198,7 @@ export function TesterSpace() {
       {step === 1 && <TestStep token={token} state={state} onNext={() => reload().then(() => setStep(2))} />}
       {step === 2 && <SiretStep token={token} state={state} onNext={() => reload().then(() => setStep(3))} />}
       {step === 3 && <ShareStep token={token} state={state} onAddSiret={() => setStep(2)} />}
+      <DeleteData token={token} onDeleted={() => setDeleted(true)} />
     </main>
   );
 }
@@ -379,6 +390,44 @@ function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterS
   );
 }
 
+/** Droit à l'effacement (RGPD) : suppression immédiate et complète, en deux clics. */
+function DeleteData({ token, onDeleted }: { token: string; onDeleted: () => void }) {
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    try {
+      await testerApi.remove(token);
+      savedToken.clear();
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof TesterError ? err.message : "Suppression impossible. Réessayez.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="delete-box">
+      {!confirm ? (
+        <button className="btn-ghost small" onClick={() => setConfirm(true)}>Supprimer mes données</button>
+      ) : (
+        <div className="stack">
+          <p className="small">Supprimer définitivement votre inscription, votre essai et vos parrainages ? Cette action est irréversible.</p>
+          {error && <p className="error">{error}</p>}
+          <div className="actions-2">
+            <button className="btn-danger" disabled={busy} onClick={remove}>{busy ? "Suppression…" : "Oui, supprimer"}</button>
+            <button className="btn-secondary" onClick={() => setConfirm(false)}>Annuler</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Conditions() {
   return (
     <details className="conditions-box" id="conditions">
@@ -388,8 +437,15 @@ function Conditions() {
         <li>Un parrainage compte quand le confrère invité s'inscrit avec votre lien <strong>et</strong> que son SIRET est vérifié comme entreprise du bâtiment en activité (vérification automatique ou sur justificatif). Un seul compte par SIRET ; pas de parrainage de son propre compte.</li>
         <li>Les avantages s'appliquent à l'ouverture commerciale du service (abonnement à {PRICE} € HT/mois), sur le compte du parrain et de l'invité. Ils ne sont ni cumulables avec une autre offre, ni échangeables contre de l'argent. Maximum : 6 mois offerts.</li>
         <li>Le tarif fondateur ({FOUNDER_PRICE} € HT/mois au lieu de {PRICE} €) est garanti 24 mois à partir de la souscription.</li>
-        <li>Si le service n'ouvre pas commercialement, aucun avantage n'est dû et aucun paiement n'aura été demandé. Vous pouvez demander la suppression de vos données à tout moment.</li>
+        <li>Si le service n'ouvre pas commercialement, aucun avantage n'est dû et aucun paiement n'aura été demandé. Vous pouvez supprimer vos données à tout moment depuis votre espace testeur.</li>
         <li>Aucun tirage au sort : les avantages dépendent uniquement du nombre de confrères vérifiés.</li>
+      </ul>
+      <p className="small conditions-title">Vos données</p>
+      <ul className="conditions">
+        <li><strong>Ce que nous collectons</strong> : nom de l'entreprise, prénom, nom, portable, métier et code postal (facultatifs), SIRET et, si besoin, la photo d'un devis ; la demande que vous remplissez pendant l'essai.</li>
+        <li><strong>Pourquoi</strong> : faire fonctionner l'essai, vérifier que vous êtes artisan du bâtiment, compter vos parrainages, et vous prévenir de l'ouverture. Aucune revente, aucune publicité de tiers.</li>
+        <li><strong>Combien de temps</strong> : pendant le programme de test, puis 12 mois après l'ouverture si vous ne devenez pas client.</li>
+        <li><strong>Vos droits</strong> : vous pouvez supprimer toutes vos données à tout moment avec le bouton « Supprimer mes données » de votre espace testeur.</li>
       </ul>
     </details>
   );

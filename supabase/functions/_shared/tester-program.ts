@@ -43,6 +43,8 @@ export interface ProgramStore {
   referralCounts(testerId: string): Promise<{ registered: number; verified: number }>;
   uploadProof(path: string, bytes: Uint8Array, contentType: string): Promise<void>;
   logFunnel(testerId: string, step: FunnelStep, sessionId: string | null, props?: Record<string, unknown>): Promise<void>;
+  /** Suppression RGPD : fiche, demandes, messages, photo de devis. L'entonnoir ne garde que des étapes anonymes. */
+  deleteTester(testerId: string): Promise<void>;
 }
 
 export interface ProgramDeps {
@@ -217,6 +219,14 @@ export async function complete(token: string, sessionId: unknown, deps: ProgramD
 /** Parcours déjà terminé sans SIRET, puis SIRET ajouté : le lien de parrainage arrive par SMS. */
 async function sendReferralIfAlreadyDone(t: Tester, deps: ProgramDeps) {
   if (t.completed_at) await sendQuietly(deps, t.artisan.owner_phone, referralLinkSms(t.first_name, referralLink(deps.appUrl, t.referral_code)));
+}
+
+/** Droit à l'effacement : le testeur supprime lui-même toutes ses données depuis son espace. */
+export async function deleteTester(token: string, deps: ProgramDeps): Promise<Result<null>> {
+  const t = await deps.store.findByToken(token);
+  if (!t) return fail(404, "Lien invalide ou données déjà supprimées.");
+  await deps.store.deleteTester(t.id);
+  return { ok: true, value: null };
 }
 
 function sessionOf(s: unknown): string | null {

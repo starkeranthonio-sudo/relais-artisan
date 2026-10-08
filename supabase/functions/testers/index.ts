@@ -4,7 +4,7 @@
 //   POST { action: "test_drive" | "verify_siret" | "skip_siret" | "complete", t, siret?, sessionId }
 //   POST multipart { action: "proof", t, siret, sessionId, file }  → photo d'un devis (vérification manuelle)
 import { serviceClient, requireEnv, supabaseProgramStore, supabaseTesterStore } from "../_shared/store.ts";
-import { checkSiret, complete, getState, register, sendProof, skipSiret, testDrive } from "../_shared/tester-program.ts";
+import { checkSiret, complete, deleteTester, getState, register, sendProof, skipSiret, testDrive } from "../_shared/tester-program.ts";
 import { twilioSender } from "../_shared/twilio.ts";
 
 const client = serviceClient();
@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
       case "verify_siret": return reply(await checkSiret(t, b.siret, b.sessionId, deps));
       case "skip_siret": return reply(await skipSiret(t, b.sessionId, deps));
       case "complete": return reply(await complete(t, b.sessionId, deps));
+      case "delete": return reply(await deleteTester(t, deps));
       default: return json(400, { error: "Action inconnue." });
     }
   } catch (err) {

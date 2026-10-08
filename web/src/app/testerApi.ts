@@ -74,6 +74,7 @@ const realApi = {
   verifySiret: (t: string, siret: string) => post<{ companyName: string }>({ action: "verify_siret", t, siret }),
   skipSiret: (t: string) => post({ action: "skip_siret", t }),
   complete: (t: string) => post({ action: "complete", t }),
+  remove: (t: string) => post({ action: "delete", t }),
   sendProof: (t: string, siret: string, file: File) => {
     const form = new FormData();
     form.set("t", t);
@@ -100,6 +101,7 @@ export const testerApi: typeof realApi = {
     t === DEMO ? wait((Object.assign(demoState, { siretStatus: "pending_manual", referralCode: "demo123" }), {})) : realApi.sendProof(t, siret, file),
   skipSiret: (t) => (t === DEMO ? wait({}) : realApi.skipSiret(t)),
   complete: (t) => (t === DEMO ? wait((demoState.completed = true, {})) : realApi.complete(t)),
+  remove: (t) => (t === DEMO ? wait({}) : realApi.remove(t)),
 };
 
 const TOKEN_KEY = "ra_tester_token";
@@ -109,6 +111,13 @@ export const savedToken = {
       return localStorage.getItem(TOKEN_KEY);
     } catch {
       return null;
+    }
+  },
+  clear: () => {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* ignore */
     }
   },
   set: (t: string) => {
