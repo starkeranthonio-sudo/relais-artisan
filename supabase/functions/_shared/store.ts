@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import type { DueQuote, FollowupStore } from "./followups.ts";
 import type { FormLead, FormStore } from "./request-form.ts";
+import type { Transfer, TransferArtisan, TransferLead, TransferStore } from "./transfers.ts";
 import type { Artisan, Lead, Store } from "./types.ts";
 
 const LEAD_COLUMNS = "id, artisan_id, client_phone, public_token, call_count, sms_sent_at";
@@ -167,6 +168,91 @@ export function supabaseFollowupStore(client: SupabaseClient): FollowupStore {
       check(await client.from("quotes").update({ next_followup_at: null, stop_reason: reason }).eq("id", quoteId));
     },
   };
+}
+
+const TRANSFER_ARTISAN = "id, business_name, owner_phone, relay_number, referred_by, created_at";
+
+/** Implémentation Supabase du TransferStore (transmission entre artisans). */
+export function supabaseTransferStore(client: SupabaseClient): TransferStore {
+  const toLead = (row: Record<string, unknown> & { quotes?: unknown }): TransferLead => {
+    const { quotes, ...rest } = row;
+    const q = Array.isArray(quotes) ? quotes[0] : quotes;
+    return { ...(rest as unknown as TransferLead), has_quote: !!q };
+  };
+  const LEAD = "id, artisan_id, client_phone, work_type, address, urgency, ai_summary, status, quotes(id)";
+
+  return {
+    async getLead(leadId) {
+      const row = check(await client.from("leads").select(LEAD).eq("id", leadId).maybeSingle());
+      return row ? toLead(row as unknown as Record<string, unknown>) : null;
+    },
+
+    async findArtisanByPhone(phone) {
+      return check(
+        await client.from("artisans").select(TRANSFER_ARTISAN).eq("owner_phone", phone).not("user_id", "is", null)
+          .order("created_at").limit(1).maybeSingle(),
+      ) as TransferArtisan | null;
+    },
+
+    async hasPendingTransfer(leadId) {
+      const { count, error } = await client.from("lead_transfers").select("id", { count: "exact", head: true })
+        .eq("lead_id", leadId).eq("status", "pending").gt("expires_at", new Date().toISOString());
+      if (error) throw new Error(error.message);
+      return (count ?? 0) > 0;
+    },
+
+    async createTransfer(t) {
+      // Une transmission expirée encore « pending » bloquerait l'index unique : on la clôt d'abord.
+      check(await client.from("lead_transfers").update({ status: "expired" })
+        .eq("lead_id", t.leadId).eq("status", "pending").lte("expires_at", new Date().toISOString()));
+      check(await client.from("lead_transfers").insert({
+        lead_id: t.leadId, from_artisan_id: t.fromArtisanId, to_phone: t.toPhone, token: t.token,
+        note: t.note, invitee_was_member: t.inviteeWasMember, expires_at: t.expiresAt.toISOString(),
+      }));
+    },
+
+    async getTransfer(token) {
+      const row = check(
+        await client.from("lead_transfers")
+          .select(`id, token, status, note, created_at, expires_at, to_artisan_id, from:artisans!lead_transfers_from_artisan_id_fkey(${TRANSFER_ARTISAN}), lead:leads(${LEAD})`)
+          .eq("token", token).maybeSingle(),
+      ) as unknown as (Omit<Transfer, "lead"> & { lead: Record<string, unknown> }) | null;
+      return row ? { ...row, lead: toLead(row.lead) } : null;
+    },
+
+    async accept(transferId, toArtisanId, at) {
+      const rows = check(
+        await client.from("lead_transfers").update({ status: "accepted", to_artisan_id: toArtisanId, decided_at: at.toISOString() })
+          .eq("id", transferId).eq("status", "pending").select("lead_id"),
+      );
+      if (!rows?.length) return false;
+      check(await client.from("leads").update({ artisan_id: toArtisanId, status: "form_submitted" }).eq("id", rows[0].lead_id));
+      return true;
+    },
+
+    async decline(transferId, toArtisanId, at) {
+      const rows = check(
+        await client.from("lead_transfers").update({ status: "declined", to_artisan_id: toArtisanId, decided_at: at.toISOString() })
+          .eq("id", transferId).eq("status", "pending").select("id"),
+      );
+      return (rows?.length ?? 0) > 0;
+    },
+
+    async setReferrer(artisanId, referrerId) {
+      check(await client.from("artisans").update({ referred_by: referrerId }).eq("id", artisanId).is("referred_by", null));
+    },
+  };
+}
+
+/** Artisan connecté, à partir de l'en-tête Authorization (jeton Supabase Auth). null si absent ou invalide. */
+export async function artisanFromRequest(client: SupabaseClient, req: Request): Promise<TransferArtisan | null> {
+  const jwt = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!jwt) return null;
+  const { data, error } = await client.auth.getUser(jwt);
+  if (error || !data.user) return null;
+  return check(
+    await client.from("artisans").select(TRANSFER_ARTISAN).eq("user_id", data.user.id).maybeSingle(),
+  ) as TransferArtisan | null;
 }
 
 export function serviceClient(): SupabaseClient {

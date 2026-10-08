@@ -1,7 +1,14 @@
 import { type FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { supabase } from "../lib/supabase.ts";
 import { toE164 } from "./format.ts";
+
+/** Page où revenir après connexion (seulement un chemin interne, jamais un autre site). */
+function useNext(fallback: string): string {
+  const [params] = useSearchParams();
+  const next = params.get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : fallback;
+}
 
 function AuthLayout({ title, lead, children }: { title: string; lead: string; children: React.ReactNode }) {
   return (
@@ -16,6 +23,7 @@ function AuthLayout({ title, lead, children }: { title: string; lead: string; ch
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const next = useNext("/app");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +36,7 @@ export function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
     if (error) return setError("Email ou mot de passe incorrect.");
-    navigate("/app", { replace: true });
+    navigate(next, { replace: true });
   }
 
   return (
@@ -45,13 +53,16 @@ export function LoginPage() {
         {error && <p className="error" role="alert">{error}</p>}
         <button className="btn-primary" disabled={busy}>{busy ? "Connexion…" : "Se connecter"}</button>
       </form>
-      <p className="auth-switch">Pas encore de compte ? <Link to="/app/inscription">Créer un compte</Link></p>
+      <p className="auth-switch">Pas encore de compte ? <Link to={`/app/inscription${next !== "/app" ? `?next=${encodeURIComponent(next)}` : ""}`}>Créer un compte</Link></p>
     </AuthLayout>
   );
 }
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const next = useNext("/app/installation");
+  const [params] = useSearchParams();
+  const referralCode = params.get("parrain") ?? undefined;
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -72,13 +83,13 @@ export function SignupPage() {
       email: email.trim(),
       password,
       options: {
-        data: { business_name: businessName.trim(), owner_phone: ownerPhone },
-        emailRedirectTo: `${window.location.origin}/app/installation`,
+        data: { business_name: businessName.trim(), owner_phone: ownerPhone, referral_code: referralCode },
+        emailRedirectTo: `${window.location.origin}${next}`,
       },
     });
     setBusy(false);
     if (error) return setError(error.message.includes("registered") ? "Un compte existe déjà avec cet email." : "Inscription impossible. Réessayez.");
-    if (data.session) navigate("/app/installation", { replace: true });
+    if (data.session) navigate(next, { replace: true });
     else setCheckEmail(true);
   }
 
@@ -114,7 +125,7 @@ export function SignupPage() {
         {error && <p className="error" role="alert">{error}</p>}
         <button className="btn-primary" disabled={busy}>{busy ? "Création…" : "Créer mon compte"}</button>
       </form>
-      <p className="auth-switch">Déjà inscrit ? <Link to="/app/connexion">Se connecter</Link></p>
+      <p className="auth-switch">Déjà inscrit ? <Link to={`/app/connexion${next !== "/app/installation" ? `?next=${encodeURIComponent(next)}` : ""}`}>Se connecter</Link></p>
       <p className="auth-switch"><Link to="/demo">Voir une démonstration</Link></p>
     </AuthLayout>
   );

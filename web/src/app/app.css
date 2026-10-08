@@ -135,3 +135,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .stat dd { margin: 0; font-size: 1.75rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .roi { color: var(--text-sec); border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; }
 .roi strong { color: var(--text); }
+
+/* Transmission à un confrère */
+.transfer-cta { gap: 12px; }
+.big-city { font-size: 1.375rem; font-weight: 800; letter-spacing: -0.01em; }
+.auth .panel { margin: 10px 0 8px; }
+.auth .btn-primary, .auth .btn-secondary { text-align: center; }

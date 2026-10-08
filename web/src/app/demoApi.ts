@@ -1,4 +1,4 @@
-import type { ArtisanApi, Lead, LeadStatus, Profile, Quote, QuoteWithLead } from "./types.ts";
+import type { ArtisanApi, Lead, LeadStatus, OutgoingTransfer, Profile, Quote, QuoteWithLead } from "./types.ts";
 
 /**
  * Données fictives pour montrer l'espace artisan sans compte (démonstration commerciale, développement).
@@ -9,7 +9,10 @@ const D = 24 * H;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 const inMs = (ms: number) => new Date(Date.now() + ms).toISOString();
 
-const profile: Profile = { id: "demo", business_name: "Dupont Plomberie", owner_phone: "+33612345678", relay_number: "+33939012345" };
+const profile: Profile = {
+  id: "demo", business_name: "Dupont Plomberie", owner_phone: "+33612345678", relay_number: "+33939012345", referral_code: "demo123",
+};
+const transfers = new Map<string, OutgoingTransfer>();
 
 function lead(p: Partial<Lead> & Pick<Lead, "id" | "client_phone">): Lead {
   return {
@@ -119,5 +122,13 @@ export const demoApi: ArtisanApi = {
       wonAmountCents: won.reduce((s, q) => s + (q.amount_cents ?? 0), 0) + 412000,
     };
   },
+  transferLead: async (leadId, phone) => {
+    transfers.set(leadId, {
+      status: "pending", to_phone: phone, created_at: new Date().toISOString(), expires_at: inMs(7 * D),
+    });
+    return { inviteeWasMember: false };
+  },
+  outgoingTransfer: async (leadId) => transfers.get(leadId) ?? null,
+  referrals: async () => ({ names: ["Martin Électricité", "Leroy Chauffage"] }),
   signOut: async () => {},
 };

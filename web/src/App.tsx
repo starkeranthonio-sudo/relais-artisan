@@ -3,6 +3,7 @@ import { BrowserRouter, Link, Route, Routes, useParams } from "react-router";
 import { RequestFormPage } from "./RequestFormPage.tsx";
 
 // L'espace artisan est chargé à part : la page client (/d/…), ouverte en 4G depuis un SMS, reste légère.
+const TransferPage = lazy(() => import("./app/TransferPage.tsx").then((m) => ({ default: m.TransferPage })));
 const ArtisanApp = lazy(() => import("./app/ArtisanApp.tsx").then((m) => ({ default: m.ArtisanApp })));
 
 function RequestFormRoute() {
@@ -29,6 +30,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/d/:token" element={<RequestFormRoute />} />
+        <Route path="/t/:token" element={<Suspense fallback={null}><TransferPage /></Suspense>} />
         <Route path="/app/*" element={<Suspense fallback={null}><ArtisanApp demo={false} /></Suspense>} />
         <Route path="/demo/*" element={<Suspense fallback={null}><ArtisanApp demo /></Suspense>} />
         <Route path="*" element={<Home />} />

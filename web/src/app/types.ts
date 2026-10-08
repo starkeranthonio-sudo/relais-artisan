@@ -8,6 +8,18 @@ export interface Profile {
   business_name: string;
   owner_phone: string;
   relay_number: string | null;
+  referral_code: string;
+}
+
+export interface OutgoingTransfer {
+  status: "pending" | "accepted" | "declined" | "expired";
+  to_phone: string;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface Referrals {
+  names: string[];
 }
 
 export interface Quote {
@@ -68,5 +80,10 @@ export interface ArtisanApi {
   listQuotes(): Promise<QuoteWithLead[]>;
   setQuoteStatus(id: string, status: "won" | "lost", amountCents?: number | null): Promise<void>;
   monthStats(monthStart: Date): Promise<MonthStats>;
+  /** Transmet la demande à un confrère (inscrit ou non) : il reçoit un SMS d'invitation. */
+  transferLead(leadId: string, phone: string, note: string): Promise<{ inviteeWasMember: boolean }>;
+  /** Dernière transmission envoyée pour cette demande, s'il y en a une. */
+  outgoingTransfer(leadId: string): Promise<OutgoingTransfer | null>;
+  referrals(): Promise<Referrals>;
   signOut(): Promise<void>;
 }

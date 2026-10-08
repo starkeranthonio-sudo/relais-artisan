@@ -70,6 +70,21 @@ Attribution d'un numéro relais (manuelle en V1) :
 update artisans set relay_number = '+33939xxxxxx' where id = '<id>';
 ```
 
+## Moteur de partage : transmission entre artisans + parrainage ✅
+
+- **« Transmettre à un confrère »** (fiche d'une demande sans devis) : l'artisan entre le portable d'un confrère, inscrit ou non. Le confrère reçoit un SMS avec un lien `/t/<jeton>` : type de travaux, ville, urgence et résumé, **sans les coordonnées du client**.
+- Confrère non inscrit : il doit **créer son compte gratuit** pour accepter, puis il revient automatiquement sur la transmission.
+- À l'acceptation : la demande lui est confiée, l'artisan d'origine et le client sont prévenus par SMS, et le **parrainage** est enregistré si le confrère vient de s'inscrire. Validité : 7 jours. Un seul confrère peut prendre le client.
+- **Parrainage** : lien `/app/inscription?parrain=<code>` dans Réglages (« 1 mois offert pour vous deux », à appliquer lors de la facturation).
+- **Mesure du coefficient viral** : `lead_transfers.invitee_was_member` et `artisans.referred_by`.
+
+```sql
+-- Coefficient viral approché : invitations envoyées à des non-inscrits, et inscriptions obtenues
+select count(*) filter (where not invitee_was_member) as invitations,
+       count(*) filter (where not invitee_was_member and status = 'accepted') as inscriptions
+from lead_transfers;
+```
+
 ## Mise en route
 
 ### 1. Supabase
@@ -83,6 +98,7 @@ supabase functions deploy twilio-voice
 supabase functions deploy twilio-sms
 supabase functions deploy request-form
 supabase functions deploy quote-followups
+supabase functions deploy lead-transfer
 ```
 
 ### 2. Twilio

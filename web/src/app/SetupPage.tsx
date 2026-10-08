@@ -19,6 +19,7 @@ export function SetupPage() {
         <p className="lead">3 minutes, une seule fois. Ensuite, chaque appel manqué est récupéré automatiquement.</p>
       </header>
       {profile.relay_number ? <Steps relay={profile.relay_number} /> : <Pending />}
+      <Referral code={profile.referral_code} businessName={profile.business_name} />
       <ProfileForm profile={profile} onSaved={reload} />
       <SignOut />
     </section>
@@ -127,5 +128,51 @@ function SignOut() {
     <button className="btn-ghost" onClick={() => api.signOut().then(() => navigate(`${base}/connexion`))}>
       Se déconnecter
     </button>
+  );
+}
+
+/** Parrainage : 1 mois offert pour l'artisan et pour chaque confrère qui s'inscrit avec son lien. */
+function Referral({ code, businessName }: { code: string; businessName: string }) {
+  const { api } = useApp();
+  const { data: referrals } = useLoad(() => api.referrals(), [api]);
+  const [copied, setCopied] = useState(false);
+  const link = `${window.location.origin}/app/inscription?parrain=${code}`;
+  const message = `Je récupère mes appels manqués et mes devis sont relancés tout seuls avec Relais Artisan. Inscris-toi avec mon lien, on a chacun 1 mois offert : ${link}`;
+
+  async function share() {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Relais Artisan", text: message });
+        return;
+      } catch {
+        /* partage annulé : on copie le lien */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* presse-papiers indisponible */
+    }
+  }
+
+  const count = referrals?.names.length ?? 0;
+  return (
+    <div className="panel stack">
+      <div>
+        <h2>Parrainez un confrère</h2>
+        <p className="muted small">1 mois offert pour vous et 1 mois pour lui, à chaque confrère qui s'inscrit avec votre lien.</p>
+      </div>
+      {count > 0 && (
+        <p>
+          <strong className="accent">{count} confrère{count > 1 ? "s" : ""} parrainé{count > 1 ? "s" : ""}</strong>
+          <span className="muted"> · {referrals!.names.join(", ")}</span>
+        </p>
+      )}
+      <button className="btn-primary" onClick={share}>{copied ? "Message copié" : "Envoyer mon lien"}</button>
+      <a className="btn-secondary" href={`sms:?&body=${encodeURIComponent(message)}`}>Par SMS</a>
+      <p className="muted small">Votre code : <code>{code}</code> · signé {businessName}</p>
+    </div>
   );
 }

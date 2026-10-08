@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase.ts";
-import type { ArtisanApi, Lead, MonthStats, Quote, QuoteWithLead } from "./types.ts";
+import { callTransferFunction } from "./transferApi.ts";
+import type { ArtisanApi, Lead, MonthStats, OutgoingTransfer, Quote, QuoteWithLead } from "./types.ts";
 
 const LEAD_COLUMNS =
   "id, client_phone, client_name, work_type, description, address, urgency, photo_paths, ai_summary, status, " +
@@ -25,7 +26,7 @@ export const supabaseApi: ArtisanApi = {
   demo: false,
 
   async getProfile() {
-    return ok(await supabase.from("artisans").select("id, business_name, owner_phone, relay_number").maybeSingle());
+    return ok(await supabase.from("artisans").select("id, business_name, owner_phone, relay_number, referral_code").maybeSingle());
   },
 
   async updateProfile(patch) {
@@ -97,6 +98,22 @@ export const supabaseApi: ArtisanApi = {
       quotesLost: (decided ?? []).filter((q) => q.status === "lost").length,
       wonAmountCents: won.reduce((sum, q) => sum + (q.amount_cents ?? 0), 0),
     } satisfies MonthStats;
+  },
+
+  async transferLead(leadId, phone, note) {
+    return callTransferFunction<{ inviteeWasMember: boolean }>({ action: "create", leadId, phone, note });
+  },
+
+  async outgoingTransfer(leadId) {
+    return ok(
+      await supabase.from("lead_transfers").select("status, to_phone, created_at, expires_at")
+        .eq("lead_id", leadId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    ) as OutgoingTransfer | null;
+  },
+
+  async referrals() {
+    const rows = ok(await supabase.from("my_referrals").select("business_name").order("created_at"));
+    return { names: (rows ?? []).map((r) => r.business_name as string) };
   },
 
   async signOut() {

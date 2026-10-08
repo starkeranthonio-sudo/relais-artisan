@@ -426,3 +426,7 @@ verify_jwt = false
 # Relances de devis : appelée par pg_cron, protégée par le secret partagé x-cron-secret.
 [functions.quote-followups]
 verify_jwt = false
+
+# Transmission entre artisans : aperçu public par jeton ; actions authentifiées vérifiées dans la fonction.
+[functions.lead-transfer]
+verify_jwt = false
