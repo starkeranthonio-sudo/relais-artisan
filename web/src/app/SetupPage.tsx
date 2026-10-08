@@ -222,14 +222,14 @@ function RecapToggle({ enabled, onChange }: { enabled: boolean; onChange: () => 
   return (
     <div className="panel toggle-row">
       <div>
-        <h2>Récapitulatif du soir</h2>
-        <p className="muted small">Un SMS vers 18 h, du lundi au samedi, seulement s'il y a des clients à rappeler ou des devis à suivre.</p>
+        <h2>SMS de suivi</h2>
+        <p className="muted small">Vers 18 h, du lundi au samedi, s'il y a des clients à rappeler ou des devis à classer. Et le 1er du mois, votre bilan.</p>
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={on}
-        aria-label="Récapitulatif du soir"
+        aria-label="SMS de suivi"
         className={`switch${on ? " on" : ""}`}
         disabled={busy}
         onClick={toggle}

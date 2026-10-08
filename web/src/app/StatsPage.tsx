@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useApp, useLoad } from "./context.tsx";
 import { euros } from "./format.ts";
 
@@ -7,7 +8,12 @@ const SUBSCRIPTION_EUROS = 59;
 export function StatsPage() {
   const { api } = useApp();
   const [now] = useState(() => new Date());
-  const [month, setMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const [params] = useSearchParams();
+  // ?mois=AAAA-MM (lien du SMS de bilan mensuel) ; sinon le mois en cours.
+  const [month, setMonth] = useState(() => {
+    const m = /^(\d{4})-(\d{2})$/.exec(params.get("mois") ?? "");
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, 1) : new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const { data: s, error } = useLoad(() => api.monthStats(month), [api, month.getTime()]);
   useEffect(() => {
     api.track("stats_view");

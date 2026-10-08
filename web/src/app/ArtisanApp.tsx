@@ -30,6 +30,7 @@ export function ArtisanApp({ demo }: { demo: boolean }) {
           <Route path="demandes/:id" element={<LeadDetailPage />} />
           <Route path="l/:token" element={<LeadFromSms />} />
           <Route path="r" element={<Navigate to={base} replace />} />
+          <Route path="b/:month" element={<MonthlyLink />} />
           <Route path="devis" element={<QuotesPage />} />
           <Route path="bilan" element={<StatsPage />} />
           <Route path="installation" element={<SetupPage />} />
@@ -85,12 +86,21 @@ function LeadFromSms() {
   return missing ? <section className="screen"><p>Demande introuvable.</p><Link to={base}>Voir mes demandes</Link></section> : null;
 }
 
+/** Lien du SMS de bilan mensuel (/app/b/AAAA-MM) : ouvre le bilan de ce mois-là. */
+function MonthlyLink() {
+  const { month = "" } = useParams();
+  const { base } = useApp();
+  return <Navigate to={`${base}/bilan${/^\d{4}-\d{2}$/.test(month) ? `?mois=${month}` : ""}`} replace />;
+}
+
 function Shell() {
   const { api, base } = useApp();
   const { pathname } = useLocation();
 
   // Une ouverture par chargement de l'espace artisan ; « sms » si on arrive par le lien du SMS (déclencheur externe).
-  const [openedFrom] = useState(() => (pathname.includes("/l/") ? "sms" : /\/r\/?$/.test(pathname) ? "recap" : "direct"));
+  const [openedFrom] = useState(() =>
+    pathname.includes("/l/") ? "sms" : /\/r\/?$/.test(pathname) ? "recap" : pathname.includes("/b/") ? "monthly" : "direct"
+  );
   useEffect(() => {
     api.track("app_open", { source: openedFrom });
   }, [api, openedFrom]);

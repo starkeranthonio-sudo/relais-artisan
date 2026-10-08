@@ -2,7 +2,8 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { formatFrench } from "./phone.ts";
 import type { DueQuote, FollowupStore } from "./followups.ts";
 import type { FormLead, FormStore } from "./request-form.ts";
-import type { RecapArtisan, RecapStore } from "./recap.ts";
+import type { MonthlyStore } from "./monthly.ts";
+import { classifyPendingQuotes, parisDate, type RecapArtisan, type RecapStore } from "./recap.ts";
 import type { Transfer, TransferArtisan, TransferLead, TransferStore } from "./transfers.ts";
 import type { Artisan, Lead, Store } from "./types.ts";
 
@@ -257,7 +258,7 @@ export function supabaseRecapStore(client: SupabaseClient): RecapStore {
       ) as RecapArtisan[];
     },
 
-    async content(artisanId) {
+    async content(artisanId, now) {
       // Clients ayant rempli leur demande, pas encore rappelés ni classés, sans devis.
       const leads = check(
         await client.from("leads").select("client_name, client_phone, quotes(id)")
@@ -269,12 +270,11 @@ export function supabaseRecapStore(client: SupabaseClient): RecapStore {
         .map((l) => l.client_name?.trim() || formatFrench(l.client_phone));
 
       const quotes = check(
-        await client.from("quotes").select("stop_reason").eq("artisan_id", artisanId).eq("status", "pending"),
-      ) as { stop_reason: string | null }[];
+        await client.from("quotes").select("sent_at, stop_reason, lead:leads(replied_at)").eq("artisan_id", artisanId).eq("status", "pending"),
+      ) as unknown as { sent_at: string; stop_reason: string | null; lead: { replied_at: string | null } | null }[];
       return {
         toCall,
-        repliedQuotes: quotes.filter((q) => q.stop_reason === "client_replied").length,
-        quotesToClose: quotes.filter((q) => q.stop_reason === "completed").length,
+        ...classifyPendingQuotes(quotes.map((q) => ({ sent_at: q.sent_at, stop_reason: q.stop_reason, replied_at: q.lead?.replied_at ?? null })), now),
       };
     },
 
@@ -282,6 +282,58 @@ export function supabaseRecapStore(client: SupabaseClient): RecapStore {
       const rows = check(
         await client.from("artisans").update({ last_recap_on: today })
           .eq("id", artisanId).or(`last_recap_on.is.null,last_recap_on.lt.${today}`).select("id"),
+      );
+      return (rows?.length ?? 0) > 0;
+    },
+  };
+}
+
+/** Implémentation Supabase du MonthlyStore (bilan du 1er du mois). */
+export function supabaseMonthlyStore(client: SupabaseClient): MonthlyStore {
+  const count = async (q: PromiseLike<{ count: number | null; error: { message: string } | null }>) => {
+    const { count: n, error } = await q;
+    if (error) throw new Error(error.message);
+    return n ?? 0;
+  };
+  const head = { count: "exact" as const, head: true };
+
+  return {
+    async candidates(month) {
+      return check(
+        await client.from("artisans").select("id, owner_phone, relay_number")
+          .eq("daily_recap", true).not("user_id", "is", null).not("relay_number", "is", null)
+          .or(`last_monthly_report.is.null,last_monthly_report.lt.${month}`),
+      ) as RecapArtisan[];
+    },
+
+    async figures(artisanId, from, to) {
+      const [f, t] = [from.toISOString(), to.toISOString()];
+      const [missedCalls, requests, won] = await Promise.all([
+        count(client.from("calls").select("id", head).eq("artisan_id", artisanId).neq("outcome", "unknown_relay").gte("created_at", f).lt("created_at", t)),
+        count(client.from("leads").select("id", head).eq("artisan_id", artisanId).gte("form_submitted_at", f).lt("form_submitted_at", t)),
+        client.from("quotes").select("amount_cents").eq("artisan_id", artisanId).eq("status", "won").gte("decided_at", f).lt("decided_at", t).then(check),
+      ]);
+      const rows = (won ?? []) as { amount_cents: number | null }[];
+      return { missedCalls, requests, wonCount: rows.length, wonCents: rows.reduce((s, q) => s + (q.amount_cents ?? 0), 0) };
+    },
+
+    async bestPreviousWonCents(artisanId, before) {
+      const rows = check(
+        await client.from("quotes").select("amount_cents, decided_at").eq("artisan_id", artisanId).eq("status", "won")
+          .lt("decided_at", before.toISOString()).gte("decided_at", new Date(before.getTime() - 730 * 86_400_000).toISOString()),
+      ) as { amount_cents: number | null; decided_at: string }[];
+      const byMonth = new Map<string, number>();
+      for (const q of rows) {
+        const key = parisDate(new Date(q.decided_at)).slice(0, 7);
+        byMonth.set(key, (byMonth.get(key) ?? 0) + (q.amount_cents ?? 0));
+      }
+      return Math.max(0, ...byMonth.values());
+    },
+
+    async claim(artisanId, month) {
+      const rows = check(
+        await client.from("artisans").update({ last_monthly_report: month })
+          .eq("id", artisanId).or(`last_monthly_report.is.null,last_monthly_report.lt.${month}`).select("id"),
       );
       return (rows?.length ?? 0) > 0;
     },

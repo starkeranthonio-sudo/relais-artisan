@@ -434,3 +434,7 @@ verify_jwt = false
 # SMS récapitulatif de 18 h : appelée par pg_cron, protégée par le secret partagé x-cron-secret.
 [functions.daily-recap]
 verify_jwt = false
+
+# Bilan du mois par SMS : appelée par pg_cron, protégée par le secret partagé x-cron-secret.
+[functions.monthly-report]
+verify_jwt = false

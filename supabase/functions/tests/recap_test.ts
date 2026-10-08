@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
-import { isRecapTime, parisDate, recapBody, type RecapContent, type RecapDeps, runRecap } from "../_shared/recap.ts";
+import { classifyPendingQuotes, isRecapTime, parisDate, recapBody, type RecapContent, type RecapDeps, runRecap } from "../_shared/recap.ts";
 import { isGsm7, toGsm7 } from "../_shared/twilio.ts";
 
 const LINK = "https://relais-artisan.pages.dev/app/r";
@@ -89,4 +89,18 @@ Deno.test("envoi : vide à 18 h 00, puis une demande arrive → le passage de 18
   deps.now = () => new Date("2026-10-07T16:30:00Z");
   assertEquals((await runRecap(deps)).sent, 1);
   assertEquals(sent.length, 1);
+});
+
+Deno.test("devis à classer : 21 jours sans réponse, ou réponse du client datant de plus de 3 jours", () => {
+  const now = new Date("2026-10-30T16:00:00Z");
+  const daysAgo = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString();
+  const r = classifyPendingQuotes([
+    { sent_at: daysAgo(5), stop_reason: null, replied_at: null },                 // en cours de relance : rien
+    { sent_at: daysAgo(15), stop_reason: "completed", replied_at: null },         // 3 relances, mais < 21 j : rien
+    { sent_at: daysAgo(22), stop_reason: "completed", replied_at: null },         // à classer
+    { sent_at: daysAgo(25), stop_reason: null, replied_at: null },                // à classer (silence)
+    { sent_at: daysAgo(6), stop_reason: "client_replied", replied_at: daysAgo(1) }, // vient de répondre
+    { sent_at: daysAgo(10), stop_reason: "client_replied", replied_at: daysAgo(4) }, // a répondu il y a 4 j : à classer
+  ], now);
+  assertEquals(r, { repliedQuotes: 1, quotesToClose: 3 });
 });

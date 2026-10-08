@@ -19,9 +19,39 @@ export interface RecapContent {
   quotesToClose: number;  // devis relancés 3 fois sans réponse : à classer gagné / perdu
 }
 
+/** Devis en attente, tels que lus en base, pour décider s'il faut les signaler. */
+export interface PendingQuote {
+  sent_at: string;
+  stop_reason: string | null;
+  replied_at: string | null; // dernière réponse SMS du client
+}
+
+const DAY_MS = 86_400_000;
+/** Sans réponse 21 jours après l'envoi (une semaine après la dernière relance de J+14) : à classer. */
+export const CLOSE_AFTER_SILENCE_DAYS = 21;
+/** Le client a répondu il y a plus de 3 jours et le devis n'est toujours pas classé : à classer. */
+export const CLOSE_AFTER_REPLY_DAYS = 3;
+
+/** Répartit les devis en attente entre « le client vient de répondre » et « à classer gagné / perdu ». */
+export function classifyPendingQuotes(quotes: PendingQuote[], now: Date): Pick<RecapContent, "repliedQuotes" | "quotesToClose"> {
+  let repliedQuotes = 0;
+  let quotesToClose = 0;
+  for (const q of quotes) {
+    const age = now.getTime() - new Date(q.sent_at).getTime();
+    if (q.stop_reason === "client_replied") {
+      const sinceReply = q.replied_at ? now.getTime() - new Date(q.replied_at).getTime() : 0;
+      if (sinceReply >= CLOSE_AFTER_REPLY_DAYS * DAY_MS) quotesToClose++;
+      else repliedQuotes++;
+    } else if (age >= CLOSE_AFTER_SILENCE_DAYS * DAY_MS) {
+      quotesToClose++;
+    }
+  }
+  return { repliedQuotes, quotesToClose };
+}
+
 export interface RecapStore {
   candidates(today: string): Promise<RecapArtisan[]>;
-  content(artisanId: string): Promise<RecapContent>;
+  content(artisanId: string, now: Date): Promise<RecapContent>;
   /** Marque le récap du jour comme fait, de façon atomique. false si un autre passage l'a déjà pris. */
   claim(artisanId: string, today: string): Promise<boolean>;
 }
@@ -85,7 +115,7 @@ export async function runRecap(deps: RecapDeps): Promise<RecapReport> {
   const link = `${deps.appUrl.replace(/\/$/, "")}/app/r`;
   for (const a of await deps.store.candidates(today)) {
     // Rien à faire pour l'instant : on ne marque pas la journée, un passage plus tard (avant 19 h) pourra envoyer.
-    const body = recapBody(await deps.store.content(a.id), link);
+    const body = recapBody(await deps.store.content(a.id, now), link);
     if (!body) {
       report.skippedEmpty++;
       continue;

@@ -104,6 +104,13 @@ Le SMS « Nouvelle demande » utilise un lien court `/app/l/<jeton>` (moins de c
 - Désactivable dans Réglages (`artisans.daily_recap`). Ouverture depuis le récap mesurée (`app_open`, `source = recap`).
 - `pg_cron` appelle `daily-recap` toutes les 15 min entre 15 h et 18 h UTC (couvre l'heure d'été et d'hiver).
 
+## Bilan du mois par SMS + devis à classer ✅
+
+- **Le 1er du mois vers 9 h** (Paris), un SMS « RelaisArt » : *Septembre : 5 270 € signés (3 chantiers), 14 appels récupérés, 9 demandes. Votre meilleur mois ! Voir : …/app/b/2026-09*. Seulement si le mois a eu de l'activité ; « meilleur mois » seulement si c'est vrai ; « Pensez à classer vos devis » si rien n'a été gagné.
+- Le lien ouvre le bilan de ce mois-là (`?mois=AAAA-MM`), ouverture mesurée (`source = monthly`).
+- **Devis à classer** (dans le récap de 18 h) : sans réponse 21 jours après l'envoi, ou client ayant répondu depuis plus de 3 jours.
+- Même interrupteur que le récap (Réglages → SMS de suivi). `pg_cron` : `monthly-report` le 1er, entre 7 h et 8 h UTC.
+
 ## Mise en route
 
 ### 1. Supabase
@@ -119,6 +126,7 @@ supabase functions deploy request-form
 supabase functions deploy quote-followups
 supabase functions deploy lead-transfer
 supabase functions deploy daily-recap
+supabase functions deploy monthly-report
 ```
 
 ### 2. Twilio
