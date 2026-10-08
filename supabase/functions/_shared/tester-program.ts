@@ -58,8 +58,24 @@ const fail = (status: number, error: string, code?: string) => ({ ok: false as c
 const personalLink = (appUrl: string, token: string) => `${appUrl.replace(/\/$/, "")}/testeurs/moi/${token}`;
 const clean = (s: unknown, max: number) => (typeof s === "string" ? s.trim().replace(/\s+/g, " ").slice(0, max) : "");
 
+const referralLink = (appUrl: string, code: string) => `${appUrl.replace(/\/$/, "")}/testeurs?parrain=${code}`;
+
+/** Renvoyé seulement à un numéro déjà inscrit qui se réinscrit (lien perdu). */
 export function personalLinkSms(firstName: string, link: string): string {
   return `RelaisArti - ${firstName}, votre espace testeur (parrainage et avantages) : ${link}`;
+}
+
+/** Dernier message du parcours : merci, on vous recontacte ; lien de parrainage seulement si SIRET fourni. */
+export function thankYouSms(firstName: string, link: string | null): string {
+  const name = firstName.split(/[\s-]/)[0].slice(0, 15); // l'expéditeur « RelaisArti » s'affiche déjà
+  return link
+    ? `Merci ${name}, vous voilà testeur fondateur ! On vous contacte à l'ouverture. Votre lien de parrainage : ${link}`
+    : `Merci ${name}, vous voilà inscrit comme testeur ! On vous contacte dès que l'outil sera disponible.`;
+}
+
+/** SIRET ajouté après la fin du parcours : on envoie le lien de parrainage. */
+export function referralLinkSms(firstName: string, link: string): string {
+  return `${firstName.split(/[\s-]/)[0].slice(0, 15)}, votre SIRET est enregistré. Votre lien de parrainage à partager : ${link}`;
 }
 
 export interface RegisterInput {
@@ -101,7 +117,7 @@ export async function register(input: RegisterInput, deps: ProgramDeps): Promise
     postalCode: postalCode || null,
   });
   await deps.store.logFunnel(tester.id, "info_submitted", sessionOf(input.sessionId), { ref: ref || null });
-  await sendQuietly(deps, phone, personalLinkSms(firstName, personalLink(deps.appUrl, token)));
+  // Pas de SMS RelaisArti ici : le premier SMS reçu est celui de l'essai ; le remerciement arrive à la fin.
   return { ok: true, value: { token } };
 }
 
@@ -152,6 +168,7 @@ export async function checkSiret(token: string, siret: unknown, sessionId: unkno
   if (r.ok) {
     await deps.store.setSiretStatus(t.id, "verified");
     await deps.store.logFunnel(t.id, "siret_verified", sessionOf(sessionId));
+    await sendReferralIfAlreadyDone(t, deps);
     return r;
   }
   // Introuvable dans la base publique : l'interface propose la photo d'un devis.
@@ -174,6 +191,7 @@ export async function sendProof(
   await deps.store.uploadProof(path, file.bytes, file.type);
   await deps.store.setSiretStatus(t.id, "pending_manual", { path, siret: /^\d{14}$/.test(digits) ? digits : null });
   await deps.store.logFunnel(t.id, "siret_manual", sessionOf(sessionId));
+  await sendReferralIfAlreadyDone(t, deps);
   return { ok: true, value: null };
 }
 
@@ -190,8 +208,15 @@ export async function complete(token: string, sessionId: unknown, deps: ProgramD
   if (!t.completed_at) {
     await deps.store.markCompleted(t.id, (deps.now ?? (() => new Date()))());
     await deps.store.logFunnel(t.id, "completed", sessionOf(sessionId));
+    const canRefer = t.siret_status === "verified" || t.siret_status === "pending_manual";
+    await sendQuietly(deps, t.artisan.owner_phone, thankYouSms(t.first_name, canRefer ? referralLink(deps.appUrl, t.referral_code) : null));
   }
   return { ok: true, value: null };
+}
+
+/** Parcours déjà terminé sans SIRET, puis SIRET ajouté : le lien de parrainage arrive par SMS. */
+async function sendReferralIfAlreadyDone(t: Tester, deps: ProgramDeps) {
+  if (t.completed_at) await sendQuietly(deps, t.artisan.owner_phone, referralLinkSms(t.first_name, referralLink(deps.appUrl, t.referral_code)));
 }
 
 function sessionOf(s: unknown): string | null {

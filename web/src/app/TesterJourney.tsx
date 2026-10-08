@@ -215,7 +215,7 @@ function TestStep({ token, state, onNext }: { token: string; state: TesterState;
       <h1>{state.firstName}, vivez l'essai</h1>
       <p className="lead">On simule un appel manqué d'un de vos clients. Vous allez voir exactement ce qu'il reçoit, puis ce que vous recevez.</p>
       <ol className="how">
-        <li>Vous recevez <strong>le SMS envoyé à vos clients</strong>, à votre nom.</li>
+        <li>Vous recevez <strong>le SMS envoyé à vos clients</strong>. Il arrive au nom de votre entreprise ({state.businessName}), comme pour eux.</li>
         <li>Touchez le lien et <strong>décrivez un besoin comme si vous étiez le client</strong> (une fuite, une panne…).</li>
         <li>Une minute après, vous recevez <strong>« Nouvelle demande »</strong> : c'est ce que vous recevrez à chaque appel manqué.</li>
       </ol>
@@ -286,7 +286,7 @@ function SiretStep({ token, state, onNext }: { token: string; state: TesterState
         <label className="field">
           <span className="label">SIRET (14 chiffres)</span>
           <input type="text" inputMode="numeric" maxLength={17} value={siret} onChange={(e) => setSiret(e.target.value.replace(/[^\d ]/g, ""))} placeholder="123 456 789 00012" />
-          <span className="hint">Il figure sur vos devis et factures.</span>
+          <span className="hint">Il figure sur vos devis et factures. Avec ou sans espaces.</span>
         </label>
         <button className={needsProof ? "btn-secondary" : "btn-primary cta"} disabled={busy || siret.replace(/\s/g, "").length !== 14}>
           {busy ? "Vérification…" : needsProof ? "Vérifier à nouveau" : "Vérifier"}
@@ -319,7 +319,7 @@ function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterS
     return (
       <div className="stack">
         <h1>Merci {state.firstName}, vous êtes inscrit</h1>
-        <p className="lead">Vous serez parmi les premiers prévenus à l'ouverture.</p>
+        <p className="lead">Vous serez parmi les premiers prévenus à l'ouverture. Un SMS de confirmation de RelaisArti vous est envoyé.</p>
         <p>Ajoutez votre SIRET pour obtenir votre lien de parrainage et gagner des avantages en invitant vos confrères.</p>
         <button className="btn-primary cta" onClick={onAddSiret}>Ajouter mon SIRET</button>
       </div>
@@ -373,7 +373,7 @@ function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterS
         {next && <p className="small muted">Encore {next.referrals - verified} pour « {next.title} ».</p>}
       </div>
       {state.siretStatus === "pending_manual" && <p className="muted small">Votre SIRET est en cours de vérification : vos parrainages comptent dès maintenant.</p>}
-      <p className="muted small">Gardez le SMS « votre espace testeur » : il vous ramène ici pour suivre vos parrainages.</p>
+      <p className="muted small">Votre lien de parrainage vous est aussi envoyé par SMS par RelaisArti. Revenez sur cette page depuis ce téléphone pour suivre vos parrainages.</p>
       <Conditions />
     </div>
   );

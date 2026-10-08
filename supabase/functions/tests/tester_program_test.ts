@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
-  checkSiret, complete, getState, personalLinkSms, type ProgramDeps, type ProgramStore, register, sendProof, skipSiret, type Tester, testDrive,
+  checkSiret, complete, getState, personalLinkSms, type ProgramDeps, referralLinkSms, thankYouSms, type ProgramStore, register, sendProof, skipSiret, type Tester, testDrive,
 } from "../_shared/tester-program.ts";
 import type { TesterDeps } from "../_shared/testers.ts";
 import { isGsm7, toGsm7 } from "../_shared/twilio.ts";
@@ -66,14 +66,38 @@ function setup() {
 
 const INFO = { businessName: "Dupont Plomberie", firstName: "Jean", lastName: "Dupont", phone: "06 12 34 56 78", trade: "Plombier", postalCode: "78140", sessionId: "session-123" };
 
-Deno.test("inscription : testeur créé, lien personnel envoyé par SMS, étape enregistrée", async () => {
+Deno.test("inscription : testeur créé, aucun SMS RelaisArti (le 1er SMS sera l'essai), étape enregistrée", async () => {
   const { deps, sent, funnel, testers } = setup();
   const r = await register(INFO, deps);
   assert(r.ok && "token" in r.value);
   assertEquals(testers[0].artisan.owner_phone, "+33612345678");
-  assertEquals(sent[0].to, "+33612345678");
-  assertStringIncludes(sent[0].body, "https://relaisarti.fr/testeurs/moi/tok1");
+  assertEquals(sent.length, 0);
   assertEquals(funnel[0], { tester: "t1", step: "info_submitted", session: "session-123" });
+});
+
+Deno.test("fin du parcours : remerciement avec lien de parrainage si SIRET, sans lien sinon ; une seule fois", async () => {
+  const withSiret = setup();
+  await register(INFO, withSiret.deps);
+  await checkSiret("tok1", "92759307900050", null, withSiret.deps);
+  await complete("tok1", null, withSiret.deps);
+  await complete("tok1", null, withSiret.deps);
+  assertEquals(withSiret.sent.length, 1);
+  assertStringIncludes(withSiret.sent[0].body, "Merci Jean, vous voilà testeur fondateur");
+  assertStringIncludes(withSiret.sent[0].body, "https://relaisarti.fr/testeurs?parrain=code1");
+
+  const without = setup();
+  await register(INFO, without.deps);
+  await skipSiret("tok1", null, without.deps);
+  await complete("tok1", null, without.deps);
+  assertEquals(without.sent.length, 1);
+  assertStringIncludes(without.sent[0].body, "vous voilà inscrit comme testeur");
+  assert(!without.sent[0].body.includes("parrain"), "pas de lien sans SIRET");
+
+  // SIRET ajouté après coup : le lien arrive par SMS.
+  await checkSiret("tok1", "92759307900050", null, without.deps);
+  assertEquals(without.sent.length, 2);
+  assertStringIncludes(without.sent[1].body, "votre SIRET est enregistré");
+  assertStringIncludes(without.sent[1].body, "parrain=code1");
 });
 
 Deno.test("inscription : validations, et numéro déjà inscrit → lien renvoyé par SMS sans être affiché", async () => {
@@ -84,8 +108,8 @@ Deno.test("inscription : validations, et numéro déjà inscrit → lien renvoy�
   await register(INFO, deps);
   const again = await register(INFO, deps);
   assert(again.ok && "existing" in again.value, "aucun jeton renvoyé à l'écran");
-  assertEquals(sent.length, 2);
-  assertStringIncludes(sent[1].body, "/testeurs/moi/tok1");
+  assertEquals(sent.length, 1);
+  assertStringIncludes(sent[0].body, "/testeurs/moi/tok1");
 });
 
 Deno.test("parrainage : le code du lien rattache le filleul ; seuls les filleuls vérifiés comptent", async () => {
@@ -136,8 +160,16 @@ Deno.test("essai (3 max), SIRET passé, parcours terminé une seule fois ; jeton
   assertEquals((await getState("inconnu", deps)).ok, false);
 });
 
-Deno.test("SMS du lien personnel : 1 SMS GSM-7", () => {
-  const body = toGsm7(personalLinkSms("Jean-Baptiste", "https://relais-artisan.pages.dev/testeurs/moi/AbCdEfGhJkMnPqRs"));
-  assert(isGsm7(body));
-  assert(body.length <= 160, `${body.length} : ${body}`);
+Deno.test("SMS RelaisArti : chacun tient en 1 SMS GSM-7", () => {
+  const ref = "https://relaisarti.pages.dev/testeurs?parrain=abc1234";
+  for (const body of [
+    personalLinkSms("Jean-Baptiste", "https://relaisarti.pages.dev/testeurs/moi/AbCdEfGhJkMnPqRs"),
+    thankYouSms("Jean-Baptiste", ref),
+    thankYouSms("Jean-Baptiste", null),
+    referralLinkSms("Jean-Baptiste", ref),
+  ]) {
+    const g = toGsm7(body);
+    assert(isGsm7(g));
+    assert(g.length <= 160, `${g.length} : ${g}`);
+  }
 });
