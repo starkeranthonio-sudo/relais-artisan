@@ -127,11 +127,11 @@ export async function submitRequestForm(raw: RawSubmission, deps: FormDeps): Pro
   return {
     status: 200,
     body: { ok: true, businessName: lead.artisan.business_name },
-    afterResponse: () => notifyArtisan(lead, submission, raw.photos, deps),
+    afterResponse: () => notifyArtisan(lead, raw.token, submission, raw.photos, deps),
   };
 }
 
-async function notifyArtisan(lead: FormLead, s: FormSubmission, photos: Photo[], deps: FormDeps): Promise<void> {
+async function notifyArtisan(lead: FormLead, token: string, s: FormSubmission, photos: Photo[], deps: FormDeps): Promise<void> {
   const details: RequestDetails = { workType: s.workType, description: s.description, urgency: s.urgency, photoCount: photos.length };
   let summary: string;
   try {
@@ -142,7 +142,8 @@ async function notifyArtisan(lead: FormLead, s: FormSubmission, photos: Photo[],
   }
   await deps.formStore.saveAiSummary(lead.id, summary);
 
-  const body = artisanSmsBody(lead, s, summary, `${deps.appUrl.replace(/\/$/, "")}/app/demandes/${lead.id}`);
+  // Lien court /app/l/<jeton> : moins de caractères dans le SMS, et l'ouverture est comptée « depuis un SMS ».
+  const body = artisanSmsBody(lead, s, summary, `${deps.appUrl.replace(/\/$/, "")}/app/l/${token}`);
   try {
     const { sid } = await deps.sendSms(lead.artisan.relay_number, lead.artisan.owner_phone, body);
     await deps.store.insertMessage({ artisanId: lead.artisan.id, leadId: lead.id, direction: "outbound_artisan", body, twilioSid: sid });

@@ -90,7 +90,7 @@ Deno.test("POST : demande enregistrée, photos stockées, résumé IA puis SMS �
     "Nouvelle demande - Marie 06 11 22 33 44\n" +
       "URGENT (aujourd'hui) - 12 rue des Lilas, Vélizy\n" +
       "Fuite sous évier cuisine, joint siphon à changer.\n" +
-      "2 photos : https://relais-artisan.fr/app/demandes/lead-1",
+      "2 photos : https://relais-artisan.fr/app/l/tok123",
   );
   assertEquals(logged, ["outbound_artisan"]);
   assert(isGsm7(sent[0].body.replace("Ça", "Ca")), "gabarit du SMS artisan en GSM-7");

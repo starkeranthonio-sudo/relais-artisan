@@ -2,6 +2,17 @@ import { supabase } from "../lib/supabase.ts";
 import { callTransferFunction } from "./transferApi.ts";
 import type { ArtisanApi, Lead, MonthStats, OutgoingTransfer, Quote, QuoteWithLead } from "./types.ts";
 
+// Identifiant de la fiche artisan, chargé une fois pour la mesure d'usage.
+let artisanIdPromise: Promise<string | null> | null = null;
+function currentArtisanId(): Promise<string | null> {
+  artisanIdPromise ??= Promise.resolve(supabase.from("artisans").select("id").maybeSingle())
+    .then(({ data }) => (data?.id as string | undefined) ?? null, () => null);
+  return artisanIdPromise;
+}
+supabase.auth.onAuthStateChange(() => {
+  artisanIdPromise = null;
+});
+
 const LEAD_COLUMNS =
   "id, client_phone, client_name, work_type, description, address, urgency, photo_paths, ai_summary, status, " +
   "call_count, created_at, last_call_at, form_submitted_at, replied_at, opted_out, quote:quotes(*)";
@@ -114,6 +125,20 @@ export const supabaseApi: ArtisanApi = {
   async referrals() {
     const rows = ok(await supabase.from("my_referrals").select("business_name").order("created_at"));
     return { names: (rows ?? []).map((r) => r.business_name as string) };
+  },
+
+  async leadIdByToken(token) {
+    const row = ok(await supabase.from("leads").select("id").eq("public_token", token).maybeSingle());
+    return (row?.id as string | undefined) ?? null;
+  },
+
+  track(name, props = {}) {
+    void currentArtisanId().then((artisanId) => {
+      if (!artisanId) return;
+      return supabase.from("events").insert({ artisan_id: artisanId, name, props }).then(({ error }) => {
+        if (error) console.warn("Mesure non enregistrée", name, error.message);
+      });
+    });
   },
 
   async signOut() {

@@ -140,6 +140,7 @@ function Referral({ code, businessName }: { code: string; businessName: string }
   const message = `Je récupère mes appels manqués et mes devis sont relancés tout seuls avec Relais Artisan. Inscris-toi avec mon lien, on a chacun 1 mois offert : ${link}`;
 
   async function share() {
+    api.track("referral_share", { channel: "share" in navigator ? "share" : "copy" });
     if (navigator.share) {
       try {
         await navigator.share({ title: "Relais Artisan", text: message });
@@ -171,7 +172,7 @@ function Referral({ code, businessName }: { code: string; businessName: string }
         </p>
       )}
       <button className="btn-primary" onClick={share}>{copied ? "Message copié" : "Envoyer mon lien"}</button>
-      <a className="btn-secondary" href={`sms:?&body=${encodeURIComponent(message)}`}>Par SMS</a>
+      <a className="btn-secondary" href={`sms:?&body=${encodeURIComponent(message)}`} onClick={() => api.track("referral_share", { channel: "sms" })}>Par SMS</a>
       <p className="muted small">Votre code : <code>{code}</code> · signé {businessName}</p>
     </div>
   );

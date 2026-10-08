@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp, useLoad } from "./context.tsx";
 import { euros } from "./format.ts";
 
@@ -9,6 +9,9 @@ export function StatsPage() {
   const [now] = useState(() => new Date());
   const [month, setMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
   const { data: s, error } = useLoad(() => api.monthStats(month), [api, month.getTime()]);
+  useEffect(() => {
+    api.track("stats_view");
+  }, [api]);
 
   const isCurrent = month.getFullYear() === now.getFullYear() && month.getMonth() === now.getMonth();
   const label = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(month);

@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useApp, useLoad } from "./context.tsx";
 import { clientLabel, euros, followupStatus, formatPhone, leadStage, parseEuros, relativeTime, shortDate, STAGE_LABEL, toE164, URGENCY_LABEL } from "./format.ts";
@@ -10,6 +10,9 @@ export function LeadDetailPage() {
   const { api, base } = useApp();
   const { data: lead, error, reload } = useLoad(() => api.getLead(id), [api, id]);
   const { data: photos } = useLoad(() => api.photoUrls(lead?.photo_paths ?? []), [api, lead?.photo_paths.join()]);
+  useEffect(() => {
+    api.track("lead_view", { lead_id: id });
+  }, [api, id]);
 
   if (error) return <section className="screen"><p className="error">{error}</p></section>;
   if (lead === undefined) return <section className="screen"><p className="muted">Chargement…</p></section>;
@@ -31,8 +34,8 @@ export function LeadDetailPage() {
       </header>
 
       <div className="actions-2">
-        <a className="btn-primary" href={`tel:${lead.client_phone}`}>Appeler</a>
-        <a className="btn-secondary" href={`sms:${lead.client_phone}`}>SMS</a>
+        <a className="btn-primary" href={`tel:${lead.client_phone}`} onClick={() => api.track("lead_call", { lead_id: lead.id })}>Appeler</a>
+        <a className="btn-secondary" href={`sms:${lead.client_phone}`} onClick={() => api.track("lead_sms", { lead_id: lead.id })}>SMS</a>
       </div>
 
       {lead.form_submitted_at ? (
@@ -91,6 +94,7 @@ function QuoteSection({ lead, onChange }: { lead: Lead; onChange: () => void }) 
     setBusy(true);
     try {
       await api.createQuote(lead.id, cents, new Date());
+      api.track("quote_declared", { lead_id: lead.id, has_amount: cents !== null });
       onChange();
     } catch {
       setError("Impossible d'enregistrer le devis. Réessayez.");
@@ -134,6 +138,7 @@ export function QuoteDecision({ quoteId, hasAmount, onChange }: { quoteId: strin
     if (status === "won" && !hasAmount && !askAmount) return setAskAmount(true);
     const cents = askAmount ? parseEuros(amount) : undefined;
     await api.setQuoteStatus(quoteId, status, cents ?? undefined);
+    api.track(status === "won" ? "quote_won" : "quote_lost", { quote_id: quoteId });
     onChange();
   }
 
@@ -173,7 +178,8 @@ function TransferSection({ leadId }: { leadId: string }) {
     setBusy(true);
     setError(null);
     try {
-      await api.transferLead(leadId, phone, note);
+      const { inviteeWasMember } = await api.transferLead(leadId, phone, note);
+      api.track("transfer_sent", { lead_id: leadId, invitee_was_member: inviteeWasMember });
       setOpen(false);
       reload();
     } catch (err) {

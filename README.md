@@ -85,6 +85,18 @@ select count(*) filter (where not invitee_was_member) as invitations,
 from lead_transfers;
 ```
 
+## Mesure des usages (Habit Testing) ✅
+
+Table `events` (écriture seule par l'artisan, lecture réservée au propriétaire du projet) : `app_open` (avec `source` = `sms` si ouvert depuis le lien du SMS), `lead_view`, `lead_call`, `lead_sms`, `quote_declared`, `quote_won`, `quote_lost`, `transfer_sent`, `referral_share`, `stats_view`.
+
+Tableaux de bord dans le SQL Editor :
+```sql
+select * from analytics_weekly_habit;  -- jours actifs sur 7 jours, ouvertures depuis SMS, appels, devis
+select * from analytics_funnel;        -- par semaine : fiches ouvertes → appels → devis → gagnés
+```
+
+Le SMS « Nouvelle demande » utilise un lien court `/app/l/<jeton>` (moins de caractères, ouverture comptée « depuis un SMS »). Un artisan non connecté revient sur la demande après connexion.
+
 ## Mise en route
 
 ### 1. Supabase

@@ -68,6 +68,10 @@ export interface MonthStats {
   wonAmountCents: number;
 }
 
+export type EventName =
+  | "app_open" | "lead_view" | "lead_call" | "lead_sms" | "quote_declared" | "quote_won" | "quote_lost"
+  | "transfer_sent" | "referral_share" | "stats_view";
+
 export interface ArtisanApi {
   readonly demo: boolean;
   getProfile(): Promise<Profile | null>;
@@ -85,5 +89,9 @@ export interface ArtisanApi {
   /** Dernière transmission envoyée pour cette demande, s'il y en a une. */
   outgoingTransfer(leadId: string): Promise<OutgoingTransfer | null>;
   referrals(): Promise<Referrals>;
+  /** Identifiant d'une demande à partir du jeton court du lien SMS (/app/l/<jeton>). */
+  leadIdByToken(token: string): Promise<string | null>;
+  /** Mesure d'usage (Habit Testing). Ne bloque jamais l'interface et n'échoue jamais. */
+  track(name: EventName, props?: Record<string, unknown>): void;
   signOut(): Promise<void>;
 }

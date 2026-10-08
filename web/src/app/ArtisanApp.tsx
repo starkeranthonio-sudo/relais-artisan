@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
-import { Link, Navigate, NavLink, Outlet, Route, Routes } from "react-router";
+import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { supabase } from "../lib/supabase.ts";
 import { supabaseApi } from "./api.ts";
 import { LoginPage, SignupPage } from "./AuthPages.tsx";
@@ -27,6 +27,7 @@ export function ArtisanApp({ demo }: { demo: boolean }) {
         <Route element={demo ? <Shell /> : <RequireSession><Shell /></RequireSession>}>
           <Route index element={<LeadsPage />} />
           <Route path="demandes/:id" element={<LeadDetailPage />} />
+          <Route path="l/:token" element={<LeadFromSms />} />
           <Route path="devis" element={<QuotesPage />} />
           <Route path="bilan" element={<StatsPage />} />
           <Route path="installation" element={<SetupPage />} />
@@ -39,13 +40,15 @@ export function ArtisanApp({ demo }: { demo: boolean }) {
 
 function RequireSession({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const { pathname } = useLocation();
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => data.subscription.unsubscribe();
   }, []);
   if (session === undefined) return <div className="screen-center muted">Chargement…</div>;
-  if (!session) return <Navigate to="/app/connexion" replace />;
+  // Après connexion, on revient sur la page demandée (ex. la demande ouverte depuis le SMS).
+  if (!session) return <Navigate to={`/app/connexion${pathname !== "/app" ? `?next=${encodeURIComponent(pathname)}` : ""}`} replace />;
   return children;
 }
 
@@ -56,8 +59,27 @@ const TABS = [
   { to: "installation", label: "Réglages", icon: "M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1", end: false },
 ];
 
+/** Lien court du SMS « Nouvelle demande » (/app/l/<jeton>) : ouvre la fiche correspondante. */
+function LeadFromSms() {
+  const { token = "" } = useParams();
+  const { api, base } = useApp();
+  const navigate = useNavigate();
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    api.leadIdByToken(token).then((id) => (id ? navigate(`${base}/demandes/${id}`, { replace: true }) : setMissing(true)));
+  }, [api, base, navigate, token]);
+  return missing ? <section className="screen"><p>Demande introuvable.</p><Link to={base}>Voir mes demandes</Link></section> : null;
+}
+
 function Shell() {
   const { api, base } = useApp();
+  const { pathname } = useLocation();
+
+  // Une ouverture par chargement de l'espace artisan ; « sms » si on arrive par le lien du SMS (déclencheur externe).
+  const [openedFrom] = useState(() => (pathname.includes("/l/") ? "sms" : "direct"));
+  useEffect(() => {
+    api.track("app_open", { source: openedFrom });
+  }, [api, openedFrom]);
   return (
     <div className="shell">
       {api.demo && (

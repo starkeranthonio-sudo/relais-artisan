@@ -130,5 +130,7 @@ export const demoApi: ArtisanApi = {
   },
   outgoingTransfer: async (leadId) => transfers.get(leadId) ?? null,
   referrals: async () => ({ names: ["Martin Électricité", "Leroy Chauffage"] }),
+  leadIdByToken: async () => "l1",
+  track: () => {},
   signOut: async () => {},
 };
