@@ -31,7 +31,13 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-export type SendSms = (from: string, to: string, body: string) => Promise<{ sid: string }>;
+/**
+ * `senderName` : nom d'expéditeur de l'artisan (« Starker ») pour les SMS adressés à ses clients.
+ * Utilisé seulement en mode expéditeur alphanumérique (SMS_SENDER_ID défini) ; sinon le SMS part du numéro relais.
+ */
+export type SendSms = (from: string, to: string, body: string, senderName?: string) => Promise<{ sid: string }>;
+
+const SENDER_NAME = /^(?=.*[A-Za-z])[A-Za-z0-9]{1,11}$/;
 
 /**
  * Envoie un SMS via l'API REST Twilio.
@@ -40,8 +46,8 @@ export type SendSms = (from: string, to: string, body: string) => Promise<{ sid:
  * le client ne peut alors pas répondre au SMS.
  */
 export function twilioSender(accountSid: string, authToken: string, senderId?: string): SendSms {
-  return async (relayNumber, to, body) => {
-    const from = senderId || relayNumber;
+  return async (relayNumber, to, body, senderName) => {
+    const from = senderId ? (senderName && SENDER_NAME.test(senderName) ? senderName : senderId) : relayNumber;
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
       method: "POST",
       headers: {

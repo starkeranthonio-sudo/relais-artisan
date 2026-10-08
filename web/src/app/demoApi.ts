@@ -10,7 +10,7 @@ const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 const inMs = (ms: number) => new Date(Date.now() + ms).toISOString();
 
 const profile: Profile = {
-  id: "demo", business_name: "Dupont Plomberie", owner_phone: "+33612345678", relay_number: "+33939012345", referral_code: "demo123",
+  id: "demo", business_name: "Dupont Plomberie", owner_phone: "+33612345678", relay_number: "+33939012345", referral_code: "demo123", sms_sender: "DupontPlomb",
 };
 const transfers = new Map<string, OutgoingTransfer>();
 

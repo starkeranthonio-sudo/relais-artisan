@@ -108,7 +108,7 @@ export async function runFollowups(deps: FollowupDeps, limit = 100): Promise<Run
 
     const body = followupBody(n, q.artisan.business_name, q.sent_at);
     try {
-      const { sid } = await deps.sendSms(q.artisan.relay_number, q.lead.client_phone, body);
+      const { sid } = await deps.sendSms(q.artisan.relay_number, q.lead.client_phone, body, q.artisan.sms_sender);
       await deps.store.insertMessage({ artisanId: q.artisan.id, leadId: q.lead.id, direction: "outbound_client", body, twilioSid: sid });
       report.sent++;
     } catch (err) {

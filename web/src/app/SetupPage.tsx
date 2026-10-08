@@ -4,6 +4,14 @@ import { useApp, useLoad } from "./context.tsx";
 import { formatPhone, nationalDigits, toE164 } from "./format.ts";
 import type { Profile } from "./types.ts";
 
+/** Règles des opérateurs pour un expéditeur SMS alphanumérique. */
+const SENDER_RE = /^(?=.*[A-Za-z])[A-Za-z0-9]{1,11}$/;
+
+/** « Élec Martin & Fils » → « ElecMartinF » : accents retirés (É → E), espaces et symboles supprimés, 11 caractères max. */
+function toSenderName(raw: string): string {
+  return raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]/g, "").slice(0, 11);
+}
+
 export function SetupPage() {
   const { api } = useApp();
   const { data: profile, error, reload } = useLoad(() => api.getProfile(), [api]);
@@ -87,6 +95,7 @@ function ProfileForm({ profile, onSaved }: { profile: Profile; onSaved: () => vo
   const { api } = useApp();
   const [name, setName] = useState(profile.business_name);
   const [phone, setPhone] = useState(formatPhone(profile.owner_phone));
+  const [sender, setSender] = useState(profile.sms_sender);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function save(e: FormEvent) {
@@ -94,8 +103,11 @@ function ProfileForm({ profile, onSaved }: { profile: Profile; onSaved: () => vo
     const e164 = toE164(phone);
     if (name.trim().length < 2) return setMsg({ ok: false, text: "Nom trop court." });
     if (!e164) return setMsg({ ok: false, text: "Numéro de portable invalide." });
+    if (!SENDER_RE.test(sender)) {
+      return setMsg({ ok: false, text: "Nom d'expéditeur : 11 caractères maximum, lettres et chiffres uniquement (au moins une lettre)." });
+    }
     try {
-      await api.updateProfile({ business_name: name.trim(), owner_phone: e164 });
+      await api.updateProfile({ business_name: name.trim(), owner_phone: e164, sms_sender: sender });
       setMsg({ ok: true, text: "Enregistré." });
       onSaved();
     } catch {
@@ -107,8 +119,19 @@ function ProfileForm({ profile, onSaved }: { profile: Profile; onSaved: () => vo
     <form className="panel stack" onSubmit={save}>
       <h2>Mon entreprise</h2>
       <label className="field">
-        <span className="label">Nom affiché dans les SMS</span>
+        <span className="label">Nom de l'entreprise</span>
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      </label>
+      <label className="field">
+        <span className="label">Expéditeur des SMS à vos clients</span>
+        <input
+          type="text"
+          maxLength={11}
+          autoCapitalize="off"
+          value={sender}
+          onChange={(e) => setSender(toSenderName(e.target.value))}
+        />
+        <span className="hint">11 caractères maximum, sans espace ni accent. Vos clients verront : <strong>{sender || "…"}</strong></span>
       </label>
       <label className="field">
         <span className="label">Portable qui reçoit les demandes</span>

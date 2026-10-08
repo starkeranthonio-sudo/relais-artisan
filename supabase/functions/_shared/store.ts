@@ -16,7 +16,7 @@ export function supabaseStore(client: SupabaseClient): Store {
   return {
     async findArtisanByRelay(relayNumber) {
       return check(
-        await client.from("artisans").select("id, business_name, owner_phone, relay_number")
+        await client.from("artisans").select("id, business_name, owner_phone, relay_number, sms_sender")
           .eq("relay_number", relayNumber).maybeSingle(),
       ) as Artisan | null;
     },
@@ -95,7 +95,7 @@ export function supabaseFormStore(client: SupabaseClient): FormStore {
     async findLeadByToken(token) {
       const row = check(
         await client.from("leads")
-          .select("id, client_phone, form_submitted_at, artisan:artisans(id, business_name, owner_phone, relay_number)")
+          .select("id, client_phone, form_submitted_at, artisan:artisans(id, business_name, owner_phone, relay_number, sms_sender)")
           .eq("public_token", token).maybeSingle(),
       ) as (Omit<FormLead, "artisan"> & { artisan: Artisan | null }) | null;
       return row?.artisan ? { ...row, artisan: row.artisan } : null;
@@ -137,7 +137,7 @@ export function supabaseFollowupStore(client: SupabaseClient): FollowupStore {
         await client.from("quotes")
           .select(
             "id, sent_at, followups_sent, " +
-              "artisan:artisans(id, business_name, owner_phone, relay_number), " +
+              "artisan:artisans(id, business_name, owner_phone, relay_number, sms_sender), " +
               "lead:leads(id, client_phone, replied_at, opted_out)",
           )
           .eq("status", "pending").lte("next_followup_at", now.toISOString())
@@ -170,7 +170,7 @@ export function supabaseFollowupStore(client: SupabaseClient): FollowupStore {
   };
 }
 
-const TRANSFER_ARTISAN = "id, business_name, owner_phone, relay_number, referred_by, created_at";
+const TRANSFER_ARTISAN = "id, business_name, owner_phone, relay_number, sms_sender, referred_by, created_at";
 
 /** Implémentation Supabase du TransferStore (transmission entre artisans). */
 export function supabaseTransferStore(client: SupabaseClient): TransferStore {

@@ -85,7 +85,7 @@ export async function handleIncomingCall(params: Record<string, string>, deps: D
     speech: standardSpeech,
     afterResponse: async () => {
       try {
-        const { sid } = await deps.sendSms(artisan.relay_number, from, body);
+        const { sid } = await deps.sendSms(artisan.relay_number, from, body, artisan.sms_sender);
         await store.markSmsSent(leadId, now);
         await store.insertMessage({ artisanId: artisan.id, leadId, direction: "outbound_client", body, twilioSid: sid });
         await store.setCallOutcome(callSid, "sms_sent", leadId);

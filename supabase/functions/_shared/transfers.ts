@@ -15,6 +15,7 @@ export interface TransferArtisan {
   business_name: string;
   owner_phone: string;
   relay_number: string | null;
+  sms_sender?: string;
   referred_by: string | null;
   created_at: string;
 }
@@ -112,7 +113,7 @@ export async function createTransfer(
   });
 
   try {
-    await deps.sendSms(input.from.relay_number ?? "", toPhone, invitationSms(input.from.business_name, lead, linkFor(deps.appUrl, token), invitee !== null));
+    await deps.sendSms(input.from.relay_number ?? "", toPhone, invitationSms(input.from.business_name, lead, linkFor(deps.appUrl, token), invitee !== null), input.from.sms_sender);
   } catch (err) {
     console.error("Échec SMS d'invitation", { leadId: lead.id, err: String(err) });
   }
@@ -171,13 +172,14 @@ export async function acceptTransfer(token: string, viewer: TransferArtisan, dep
   }
 
   const relay = t.from.relay_number ?? "";
-  const notifications: [string, string][] = [
-    [t.from.owner_phone, `${viewer.business_name} a accepté le client que vous lui avez transmis (${teaser(t.lead)}). Merci !`],
-    [t.lead.client_phone, `${t.from.business_name} ne peut pas intervenir et vous met en relation avec ${viewer.business_name}, qui va vous recontacter rapidement.`],
+  // L'artisan d'origine est prévenu par « RelaisArt » ; le client, au nom de l'artisan qu'il avait appelé.
+  const notifications: [string, string, string | undefined][] = [
+    [t.from.owner_phone, `${viewer.business_name} a accepté le client que vous lui avez transmis (${teaser(t.lead)}). Merci !`, undefined],
+    [t.lead.client_phone, `${t.from.business_name} ne peut pas intervenir et vous met en relation avec ${viewer.business_name}, qui va vous recontacter rapidement.`, t.from.sms_sender],
   ];
-  for (const [to, body] of notifications) {
+  for (const [to, body, senderName] of notifications) {
     try {
-      await deps.sendSms(relay, to, body);
+      await deps.sendSms(relay, to, body, senderName);
     } catch (err) {
       console.error("Échec SMS après acceptation", { transferId: t.id, err: String(err) });
     }

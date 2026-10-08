@@ -3,6 +3,7 @@ export interface Artisan {
   business_name: string;
   owner_phone: string;
   relay_number: string;
+  sms_sender?: string;
 }
 
 export interface Lead {
