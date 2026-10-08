@@ -9,7 +9,7 @@ const JPEG: Photo = { mediaType: "image/jpeg", bytes: new Uint8Array([0xff, 0xd8
 
 function setup() {
   const lead: FormLead & { submission?: unknown; ai_summary?: string } = {
-    id: "lead-1", artisan: DUPONT, client_phone: "+33611223344", form_submitted_at: null,
+    id: "lead-1", artisan: { ...DUPONT, user_id: "user-1" }, client_phone: "+33611223344", form_submitted_at: null,
   };
   const uploads: string[] = [];
   const sent: { from: string; to: string; body: string }[] = [];
@@ -142,4 +142,14 @@ Deno.test("résumé : une ligne, tronqué à la longueur max", () => {
   assertEquals(long.length, SUMMARY_MAX_CHARS);
   assert(long.endsWith("…"));
   assert(fallbackSummary({ workType: "Électricité", description: "y".repeat(400), urgency: "week", photoCount: 0 }).length <= SUMMARY_MAX_CHARS);
+});
+
+Deno.test("testeur (sans compte) : le SMS « Nouvelle demande » ouvre l'aperçu /essai, et l'aperçu est renvoyé", async () => {
+  const { deps, lead, sent } = setup();
+  lead.artisan = { ...DUPONT, user_id: null };
+  await (await submitRequestForm(valid(), deps)).afterResponse!();
+  assertStringIncludes(sent[0].body, "https://relais-artisan.fr/essai/tok123");
+  Object.assign(lead, { work_type: "Plomberie / fuite", urgency: "urgent", address: "12 rue des Lilas", description: "Fuite", ai_summary: "Fuite évier" });
+  const res = await getRequestForm("tok123", deps.formStore);
+  assertEquals((res.body.preview as { summary: string }).summary, "Fuite évier");
 });

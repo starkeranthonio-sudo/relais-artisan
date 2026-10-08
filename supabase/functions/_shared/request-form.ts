@@ -23,10 +23,20 @@ export const WORK_TYPES = [
 
 export interface FormLead {
   id: string;
-  artisan: Artisan;
+  artisan: Artisan & { user_id?: string | null };
   client_phone: string;
   form_submitted_at: string | null;
+  // Rempli après l'envoi du formulaire (affiché au testeur sur /essai/<jeton>).
+  work_type?: string | null;
+  urgency?: Urgency | null;
+  address?: string | null;
+  description?: string | null;
+  ai_summary?: string | null;
+  client_name?: string | null;
 }
+
+/** Fiche « testeur » (programme sans compte) : pas d'utilisateur rattaché. */
+const isTester = (lead: FormLead) => lead.artisan.user_id === null;
 
 export interface FormSubmission {
   clientName: string;
@@ -67,7 +77,20 @@ export async function getRequestForm(token: string, formStore: FormStore): Promi
   if (!lead) return { status: 404, body: { error: "Lien invalide ou expiré." } };
   return {
     status: 200,
-    body: { businessName: lead.artisan.business_name, submitted: lead.form_submitted_at !== null, workTypes: WORK_TYPES },
+    body: {
+      businessName: lead.artisan.business_name,
+      submitted: lead.form_submitted_at !== null,
+      workTypes: WORK_TYPES,
+      // Pour un testeur, la demande remplie est réaffichée telle que l'artisan la recevrait.
+      ...(lead.form_submitted_at && isTester(lead)
+        ? {
+          preview: {
+            clientName: lead.client_name ?? null, workType: lead.work_type ?? null, urgency: lead.urgency ?? null,
+            address: lead.address ?? null, description: lead.description ?? null, summary: lead.ai_summary ?? null,
+          },
+        }
+        : {}),
+    },
   };
 }
 
@@ -143,7 +166,9 @@ async function notifyArtisan(lead: FormLead, token: string, s: FormSubmission, p
   await deps.formStore.saveAiSummary(lead.id, summary);
 
   // Lien court /app/l/<jeton> : moins de caractères dans le SMS, et l'ouverture est comptée « depuis un SMS ».
-  const body = artisanSmsBody(lead, s, summary, `${deps.appUrl.replace(/\/$/, "")}/app/l/${token}`);
+  // Testeur (sans compte) : le lien ouvre l'aperçu de la demande ; artisan : sa fiche dans l'application.
+  const base = deps.appUrl.replace(/\/$/, "");
+  const body = artisanSmsBody(lead, s, summary, isTester(lead) ? `${base}/essai/${token}` : `${base}/app/l/${token}`);
   try {
     const { sid } = await deps.sendSms(lead.artisan.relay_number, lead.artisan.owner_phone, body);
     await deps.store.insertMessage({ artisanId: lead.artisan.id, leadId: lead.id, direction: "outbound_artisan", body, twilioSid: sid });

@@ -208,7 +208,7 @@ function TransferSection({ leadId }: { leadId: string }) {
       <div className="panel transfer-cta">
         <div>
           <h2>Pas pour vous ?</h2>
-          <p className="muted small">Pas votre métier, ou pas le temps : transmettez ce client à un confrère de confiance. Il reçoit la demande par SMS, même s'il n'utilise pas encore Relais Artisan.</p>
+          <p className="muted small">Pas votre métier, ou pas le temps : transmettez ce client à un confrère de confiance. Il reçoit la demande par SMS, même s'il n'utilise pas encore RelaisArti.</p>
           {transfer?.status === "declined" && <p className="small accent">Votre dernier confrère n'a pas pu le prendre.</p>}
         </div>
         <button className="btn-secondary" onClick={() => setOpen(true)}>Transmettre à un confrère</button>

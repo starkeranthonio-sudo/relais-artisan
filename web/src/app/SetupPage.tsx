@@ -166,7 +166,7 @@ function Referral({ profile, onChange }: { profile: Profile; onChange: () => voi
   const { data: referrals } = useLoad(() => api.referrals(), [api]);
   const [copied, setCopied] = useState(false);
   const link = `${window.location.origin}/testeurs?parrain=${profile.referral_code}`;
-  const message = `Je teste Relais Artisan : mes appels manqués deviennent des demandes claires et mes devis sont relancés tout seuls. Inscris-toi comme testeur avec mon lien, tu auras ${INVITEE_REWARD} : ${link}`;
+  const message = `Je teste RelaisArti : mes appels manqués deviennent des demandes claires et mes devis sont relancés tout seuls. Inscris-toi comme testeur avec mon lien, tu auras ${INVITEE_REWARD} : ${link}`;
   const verified = referrals?.verified ?? 0;
   const reached = currentTier(verified);
   const next = nextTier(verified);
@@ -175,7 +175,7 @@ function Referral({ profile, onChange }: { profile: Profile; onChange: () => voi
     api.track("referral_share", { channel: "share" in navigator ? "share" : "copy" });
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Relais Artisan", text: message });
+        await navigator.share({ title: "RelaisArti", text: message });
         return;
       } catch {
         /* partage annulé : on copie le message */

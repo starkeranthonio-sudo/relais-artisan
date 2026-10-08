@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router";
 import { useApp, useLoad } from "./context.tsx";
 import { euros } from "./format.ts";
 
-const SUBSCRIPTION_EUROS = 59;
+const SUBSCRIPTION_EUROS = 39;
 
 export function StatsPage() {
   const { api } = useApp();

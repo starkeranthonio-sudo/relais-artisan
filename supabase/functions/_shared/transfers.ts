@@ -172,7 +172,7 @@ export async function acceptTransfer(token: string, viewer: TransferArtisan, dep
   }
 
   const relay = t.from.relay_number ?? "";
-  // L'artisan d'origine est prévenu par « RelaisArt » ; le client, au nom de l'artisan qu'il avait appelé.
+  // L'artisan d'origine est prévenu par « RelaisArti » ; le client, au nom de l'artisan qu'il avait appelé.
   const notifications: [string, string, string | undefined][] = [
     [t.from.owner_phone, `${viewer.business_name} a accepté le client que vous lui avez transmis (${teaser(t.lead)}). Merci !`, undefined],
     [t.lead.client_phone, `${t.from.business_name} ne peut pas intervenir et vous met en relation avec ${viewer.business_name}, qui va vous recontacter rapidement.`, t.from.sms_sender],

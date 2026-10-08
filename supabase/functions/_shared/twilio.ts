@@ -41,7 +41,7 @@ const SENDER_NAME = /^(?=.*[A-Za-z])[A-Za-z0-9]{1,11}$/;
 
 /**
  * Envoie un SMS via l'API REST Twilio.
- * `senderId` (facultatif) : nom d'expéditeur alphanumérique (11 caractères max, ex. « RelaisArt ») utilisé à la place
+ * `senderId` (facultatif) : nom d'expéditeur alphanumérique (11 caractères max, ex. « RelaisArti ») utilisé à la place
  * du numéro relais. Utile tant que le numéro relais ne peut pas envoyer de SMS (numéro américain non enregistré A2P) ;
  * le client ne peut alors pas répondre au SMS.
  */

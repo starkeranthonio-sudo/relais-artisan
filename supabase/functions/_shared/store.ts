@@ -5,6 +5,7 @@ import type { FormLead, FormStore } from "./request-form.ts";
 import type { MonthlyStore } from "./monthly.ts";
 import type { ReviewArtisan, ReviewLead, ReviewStore } from "./reviews.ts";
 import { MAX_TEST_DRIVES, type TesterArtisan, type TesterStore } from "./testers.ts";
+import type { ProgramStore, Tester } from "./tester-program.ts";
 import { classifyPendingQuotes, parisDate, type RecapArtisan, type RecapStore } from "./recap.ts";
 import type { Transfer, TransferArtisan, TransferLead, TransferStore } from "./transfers.ts";
 import type { Artisan, Lead, Store } from "./types.ts";
@@ -100,7 +101,7 @@ export function supabaseFormStore(client: SupabaseClient): FormStore {
     async findLeadByToken(token) {
       const row = check(
         await client.from("leads")
-          .select("id, client_phone, form_submitted_at, artisan:artisans(id, business_name, owner_phone, relay_number, sms_sender)")
+          .select("id, client_phone, form_submitted_at, work_type, urgency, address, description, ai_summary, client_name, artisan:artisans(id, business_name, owner_phone, relay_number, sms_sender, user_id)")
           .eq("public_token", token).maybeSingle(),
       ) as (Omit<FormLead, "artisan"> & { artisan: Artisan | null }) | null;
       return row?.artisan ? { ...row, artisan: row.artisan } : null;
@@ -402,6 +403,70 @@ export function supabaseTesterStore(client: SupabaseClient): TesterStore {
       if (error?.code === "23505") return false; // SIRET déjà rattaché à un autre compte
       if (error) throw new Error(error.message);
       return true;
+    },
+  };
+}
+
+const TESTER_SELECT =
+  "id, token, referral_code, first_name, last_name, siret_status, completed_at, " +
+  "artisan:artisans(id, business_name, owner_phone, relay_number, sms_sender, client_sms_template, siret, test_drives_used, siret_company_name)";
+
+/** Implémentation Supabase du ProgramStore (parcours testeurs sans compte). */
+export function supabaseProgramStore(client: SupabaseClient): ProgramStore {
+  const one = (row: unknown) => row as Tester | null;
+  return {
+    async findByPhone(phone) {
+      const row = check(
+        await client.from("testers").select("token, artisan:artisans!inner(owner_phone)").eq("artisan.owner_phone", phone).limit(1).maybeSingle(),
+      ) as { token: string } | null;
+      return row ? { token: row.token } : null;
+    },
+    async findByToken(token) {
+      if (!/^[A-Za-z0-9]{8,32}$/.test(token)) return null;
+      return one(check(await client.from("testers").select(TESTER_SELECT).eq("token", token).maybeSingle()));
+    },
+    async findIdByReferralCode(code) {
+      const row = check(await client.from("testers").select("id").eq("referral_code", code).maybeSingle()) as { id: string } | null;
+      return row?.id ?? null;
+    },
+    async createTester(t) {
+      const artisan = check(
+        await client.from("artisans").insert({
+          business_name: t.businessName, owner_phone: t.phone, trade: t.trade, postal_code: t.postalCode,
+        }).select("id").single(),
+      ) as { id: string };
+      const row = check(
+        await client.from("testers").insert({
+          artisan_id: artisan.id, token: t.token, first_name: t.firstName, last_name: t.lastName, referred_by: t.referredBy,
+        }).select(TESTER_SELECT).single(),
+      );
+      return one(row)!;
+    },
+    async setSiretStatus(testerId, status, proof) {
+      const patch: Record<string, unknown> = { siret_status: status };
+      if (proof) patch.proof_path = proof.path;
+      const row = check(await client.from("testers").update(patch).eq("id", testerId).select("artisan_id").single()) as { artisan_id: string };
+      // SIRET déclaré (non vérifié) à côté de la photo : rattaché à la fiche si libre.
+      if (proof?.siret) {
+        const { error } = await client.from("artisans").update({ siret: proof.siret }).eq("id", row.artisan_id).is("siret_verified_at", null);
+        if (error && error.code !== "23505") throw new Error(error.message);
+      }
+    },
+    async markCompleted(testerId, at) {
+      check(await client.from("testers").update({ completed_at: at.toISOString() }).eq("id", testerId).is("completed_at", null));
+    },
+    async referralCounts(testerId) {
+      const rows = check(
+        await client.from("testers").select("artisan:artisans(siret_verified_at)").eq("referred_by", testerId),
+      ) as unknown as { artisan: { siret_verified_at: string | null } | null }[];
+      return { registered: rows.length, verified: rows.filter((r) => r.artisan?.siret_verified_at).length };
+    },
+    async uploadProof(path, bytes, contentType) {
+      const { error } = await client.storage.from("siret-proofs").upload(path, bytes, { contentType });
+      if (error) throw new Error(error.message);
+    },
+    async logFunnel(testerId, step, sessionId, props = {}) {
+      check(await client.from("funnel_events").insert({ tester_id: testerId, step, session_id: sessionId ?? `tester-${testerId}`, props }));
     },
   };
 }

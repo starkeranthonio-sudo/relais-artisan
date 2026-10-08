@@ -21,7 +21,7 @@ export function TransferPage() {
   const demo = token === DEMO_TRANSFER_TOKEN;
 
   useEffect(() => {
-    document.title = "Un client pour vous – Relais Artisan";
+    document.title = "Un client pour vous – RelaisArti";
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
   }, []);
 
@@ -100,7 +100,7 @@ export function TransferPage() {
             <p>Pour voir les coordonnées du client et le contacter, créez votre compte gratuit (1 minute).</p>
             <Link className="btn-primary" to={`/app/inscription?next=${next}`}>Créer mon compte gratuit</Link>
             <Link className="btn-secondary" to={`/app/connexion?next=${next}`}>J'ai déjà un compte</Link>
-            <p className="muted small">Relais Artisan récupère vos appels manqués et relance vos devis automatiquement.</p>
+            <p className="muted small">RelaisArti récupère vos appels manqués et relance vos devis automatiquement.</p>
           </div>
         )
       ) : (

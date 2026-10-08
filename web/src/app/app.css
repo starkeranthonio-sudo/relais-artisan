@@ -205,3 +205,28 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .how strong, .conditions strong { color: var(--text); }
 .conditions { font-size: 0.875rem; }
 .center-text { text-align: center; }
+
+/* Parcours testeurs */
+.stepper { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stepper li { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; color: var(--text-dim); }
+.stepper li span {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 800;
+  border: 1px solid var(--line-strong);
+}
+.stepper li.done { color: var(--text-sec); }
+.stepper li.done span { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-text); }
+.stepper li.current { color: var(--text); }
+.stepper li.current span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.features { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.features li { display: flex; flex-direction: column; gap: 2px; padding-left: 14px; border-left: 3px solid var(--accent); }
+.features li span { color: var(--text-sec); font-size: 0.9375rem; }
+.field-row.half { grid-template-columns: 1fr 1fr; }
+.share-link { background: var(--subtle); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 12px 14px; overflow-wrap: anywhere; }
+.share-link code { font-size: 0.9375rem; }
+.conditions-box { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 8px; }
+.conditions-box summary { cursor: pointer; font-weight: 600; color: var(--text-sec); }
+.conditions-box .conditions { margin-top: 10px; }
+.proof input[type="file"] { color: var(--text-sec); }
+.founders h1 { font-size: 1.75rem; }
+
+.hint.tight { margin-top: -6px; }

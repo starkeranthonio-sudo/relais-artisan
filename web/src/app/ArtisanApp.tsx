@@ -17,7 +17,7 @@ import "./app.css";
 export function ArtisanApp({ demo }: { demo: boolean }) {
   const base = demo ? "/demo" : "/app";
   useEffect(() => {
-    document.title = "Relais Artisan";
+    document.title = "RelaisArti";
   }, []);
   return (
     <AppProvider value={{ api: demo ? demoApi : supabaseApi, base }}>

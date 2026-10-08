@@ -446,3 +446,7 @@ verify_jwt = false
 # Outils de l'artisan (essai, SIRET) : authentification vérifiée dans la fonction.
 [functions.artisan-tools]
 verify_jwt = false
+
+# Parcours testeurs (public, identifié par jeton secret).
+[functions.testers]
+verify_jwt = false

@@ -64,7 +64,7 @@ function SocialButtons({ next, referralCode }: { next: string; referralCode?: st
 function AuthLayout({ title, lead, children }: { title: string; lead: string; children: React.ReactNode }) {
   return (
     <main className="auth">
-      <p className="eyebrow">Relais Artisan</p>
+      <p className="eyebrow">RelaisArti</p>
       <h1>{title}</h1>
       <p className="lead">{lead}</p>
       {children}

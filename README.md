@@ -1,4 +1,6 @@
-# Relais Artisan (nom provisoire)
+# RelaisArti
+
+Site : https://relaisarti.pages.dev · Parcours testeurs : https://relaisarti.pages.dev/testeurs
 
 Un artisan ne perd plus de client à cause d'un appel manqué ou d'un devis oublié.
 
@@ -124,6 +126,18 @@ Le SMS « Nouvelle demande » utilise un lien court `/app/l/<jeton>` (moins de c
 - **Essai** (Réglages → « Faire l'essai », 3 max) : simule un appel manqué ; l'artisan reçoit le SMS client à son nom, remplit la demande, reçoit « Nouvelle demande ». Edge Function `artisan-tools` (`test_drive`).
 - **SIRET facultatif**, vérifié dans la base Sirene (API Recherche d'entreprises : établissement actif, section F construction, clé de Luhn, 1 compte par SIRET). Seuls les filleuls vérifiés comptent dans les paliers 1 / 3 / 5 / 10.
 - Suivi de la validation : `select * from analytics_validation;` (inscrits, essais, SIRET vérifiés, parrainages).
+
+## Parcours testeurs RelaisArti (sans compte) ✅
+
+`/testeurs` (lien de parrainage : `/testeurs?parrain=<code>`) : présentation et fonctionnalités → **Infos** (entreprise, prénom, nom, portable ; métier et code postal facultatifs) → espace personnel `/testeurs/moi/<jeton>` (lien envoyé par SMS) : **Essai** (appel manqué simulé, le numéro relais n'est jamais montré ; le SMS « Nouvelle demande » ouvre `/essai/<jeton>`) → **SIRET** (vérification automatique, ou photo d'un devis → vérification manuelle) → **Partage** (lien, WhatsApp, SMS, copie ; paliers 1/3/5/10 ; seuls les filleuls au SIRET vérifié comptent). Démo : `/testeurs/moi/demo`. Prix affiché : 39 € HT/mois (tarif fondateur 29 €).
+
+Suivi (SQL Editor) :
+```sql
+select * from analytics_testers_funnel;   -- où les gens s'arrêtent (visiteurs distincts par étape, 30 jours)
+select * from analytics_testers;          -- chaque testeur : avancement, filleuls, clics sur son lien
+select * from admin_siret_pending;        -- photos de devis à vérifier (bucket Storage « siret-proofs »)
+select public.admin_validate_siret('<tester_id>', true, 'NOM OFFICIEL');  -- valider (false = refuser)
+```
 
 ## Mise en route
 
