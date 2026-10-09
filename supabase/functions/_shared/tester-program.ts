@@ -2,6 +2,7 @@ import { randomToken } from "./missed-call.ts";
 import { formatFrench, toE164 } from "./phone.ts";
 import { type Result, startTestDrive, type TesterArtisan, type TesterDeps, verifySiret } from "./testers.ts";
 import { type Answers, interestOf, isComplete, isValidAnswer } from "./survey.ts";
+import { sponsorSms } from "./tiers.ts";
 import type { SendSms } from "./twilio.ts";
 
 /**
@@ -23,6 +24,7 @@ export interface Tester {
   completed_at: string | null;
   survey: Answers;
   survey_completed_at: string | null;
+  referred_by: string | null;
   artisan: TesterArtisan & { test_drives_used: number; siret_company_name: string | null };
 }
 
@@ -41,6 +43,7 @@ export interface ProgramStore {
   findByPhone(phone: string): Promise<{ token: string } | null>;
   findByToken(token: string): Promise<Tester | null>;
   findIdByReferralCode(code: string): Promise<string | null>;
+  findById(id: string): Promise<Tester | null>;
   createTester(t: NewTester): Promise<Tester>;
   setSiretStatus(testerId: string, status: SiretStatus, proof?: { path: string; siret: string | null }): Promise<void>;
   markCompleted(testerId: string, at: Date): Promise<void>;
@@ -227,8 +230,18 @@ export async function complete(token: string, sessionId: unknown, deps: ProgramD
     await deps.store.logFunnel(t.id, "completed", sessionOf(sessionId));
     const canRefer = t.siret_status === "verified" || t.siret_status === "pending_manual";
     await sendQuietly(deps, t.artisan.owner_phone, thankYouSms(t.first_name, canRefer ? referralLink(deps.appUrl, t.referral_code) : null));
+    await notifySponsor(t, deps);
   }
   return { ok: true, value: null };
+}
+
+/** Le filleul est allé au bout (essai fait) : on remercie le parrain, on annonce sa progression, on redonne son lien. */
+async function notifySponsor(t: Tester, deps: ProgramDeps) {
+  if (!t.referred_by || !(await deps.store.hasCompletedTest(t.artisan.id))) return;
+  const sponsor = await deps.store.findById(t.referred_by);
+  if (!sponsor) return;
+  const { counted } = await deps.store.referralCounts(sponsor.id);
+  await sendQuietly(deps, sponsor.artisan.owner_phone, sponsorSms(sponsor.first_name, t.first_name, counted, referralLink(deps.appUrl, sponsor.referral_code)));
 }
 
 /** Parcours déjà terminé sans SIRET, puis SIRET ajouté : le lien de parrainage arrive par SMS. */

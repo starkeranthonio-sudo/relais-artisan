@@ -408,7 +408,7 @@ export function supabaseTesterStore(client: SupabaseClient): TesterStore {
 }
 
 const TESTER_SELECT =
-  "id, token, referral_code, first_name, last_name, siret_status, completed_at, survey, survey_completed_at, " +
+  "id, token, referral_code, referred_by, first_name, last_name, siret_status, completed_at, survey, survey_completed_at, " +
   "artisan:artisans(id, business_name, owner_phone, relay_number, sms_sender, client_sms_template, siret, test_drives_used, siret_company_name)";
 
 /** Implémentation Supabase du ProgramStore (parcours testeurs sans compte). */
@@ -424,6 +424,9 @@ export function supabaseProgramStore(client: SupabaseClient): ProgramStore {
     async findByToken(token) {
       if (!/^[A-Za-z0-9]{8,32}$/.test(token)) return null;
       return one(check(await client.from("testers").select(TESTER_SELECT).eq("token", token).maybeSingle()));
+    },
+    async findById(id) {
+      return one(check(await client.from("testers").select(TESTER_SELECT).eq("id", id).maybeSingle()));
     },
     async findIdByReferralCode(code) {
       const row = check(await client.from("testers").select("id").eq("referral_code", code).maybeSingle()) as { id: string } | null;

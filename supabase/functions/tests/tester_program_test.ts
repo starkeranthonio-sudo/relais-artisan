@@ -3,6 +3,7 @@ import {
   answerQuestion, checkSiret, complete, deleteTester, finishSurvey, getState, personalLinkSms, type ProgramDeps, referralLinkSms, thankYouSms, type ProgramStore, register, sendProof, skipSiret, type Tester, testDrive,
 } from "../_shared/tester-program.ts";
 import type { TesterDeps } from "../_shared/testers.ts";
+import { sponsorSms } from "../_shared/tiers.ts";
 import { isGsm7, toGsm7 } from "../_shared/twilio.ts";
 
 function setup() {
@@ -17,12 +18,13 @@ function setup() {
   const store: ProgramStore = {
     findByPhone: (p) => Promise.resolve(testers.find((t) => t.artisan.owner_phone === p) ?? null),
     findByToken: (tok) => Promise.resolve(testers.find((t) => t.token === tok) ?? null),
+    findById: (id) => Promise.resolve(testers.find((t) => t.id === id) ?? null),
     findIdByReferralCode: (c) => Promise.resolve(testers.find((t) => t.referral_code === c)?.id ?? null),
     createTester: (nt) => {
       n++;
       const t: Tester = {
         id: `t${n}`, token: nt.token, referral_code: `code${n}`, first_name: nt.firstName, last_name: nt.lastName,
-        siret_status: "none", completed_at: null, survey: {}, survey_completed_at: null,
+        siret_status: "none", completed_at: null, survey: {}, survey_completed_at: null, referred_by: nt.referredBy,
         artisan: { id: `a${n}`, business_name: nt.businessName, owner_phone: nt.phone, relay_number: null, siret: null, test_drives_used: 0, siret_company_name: null },
       };
       testers.push(t);
@@ -34,7 +36,7 @@ function setup() {
     hasCompletedTest: (artisanId) => Promise.resolve(completedTests.has(artisanId)),
     referralCounts: (id) => {
       const kids = testers.filter((t) => referredBy.get(t.id) === id);
-      return Promise.resolve({ registered: kids.length, counted: kids.filter((k) => k.completed_at !== null).length });
+      return Promise.resolve({ registered: kids.length, counted: kids.filter((k) => k.completed_at !== null && completedTests.has(k.artisan.id)).length });
     },
     uploadProof: (path) => (proofs.push(path), Promise.resolve()),
     logFunnel: (tester, step, session) => (funnel.push({ tester, step, session }), Promise.resolve()),
@@ -123,11 +125,12 @@ Deno.test("inscription : validations, et numéro déjà inscrit → lien renvoy�
 });
 
 Deno.test("parrainage : le code du lien rattache le filleul ; seuls ceux allés au bout comptent (sans SIRET)", async () => {
-  const { deps, referredBy } = setup();
+  const { deps, referredBy, completedTests } = setup();
   await register(INFO, deps);
   await register({ ...INFO, phone: "0611111111", ref: "CODE1" }, deps);
   await register({ ...INFO, phone: "0622222222", ref: "code1" }, deps);
   assertEquals(referredBy.get("t2"), "t1");
+  completedTests.add("a2");
   await skipSiret("tok2", null, deps);
   await complete("tok2", null, deps);
   const s = await getState("tok1", deps);
@@ -222,4 +225,33 @@ Deno.test("état : « essai fait » seulement quand la demande d'essai a été r
   completedTests.add("a1");
   const after = await getState("tok1", deps);
   assert(after.ok && after.value.testCompleted === true);
+});
+
+Deno.test("SMS au parrain : à chaque filleul allé au bout (essai fait), progression ou palier, toujours avec son lien", async () => {
+  const { deps, sent, completedTests } = setup();
+  await register({ ...INFO, firstName: "Jean" }, deps); // parrain t1, code1
+  const finish = async (n: number, phone: string, name: string, essai = true) => {
+    await register({ ...INFO, firstName: name, phone, ref: "code1" }, deps);
+    if (essai) completedTests.add(`a${n}`);
+    await complete(`tok${n}`, null, deps);
+  };
+  await finish(2, "0611111111", "Marc");
+  const toSponsor = () => sent.filter((m) => m.to === "+33612345678");
+  assertStringIncludes(toSponsor()[0].body, "Bravo Jean ! Avec Marc, vous avez 1 confrère : « Membre fondateur » débloqué.");
+  assertStringIncludes(toSponsor()[0].body, "https://relaisarti.fr/testeurs?parrain=code1");
+  await finish(3, "0622222222", "Paul");
+  assertStringIncludes(toSponsor()[1].body, "Paul s'est inscrit grâce à vous, merci ! 2 sur 3 pour « Tarif fondateur »");
+  await finish(4, "0633333333", "Luc", false); // essai non fait : pas compté, pas de SMS
+  assertEquals(toSponsor().length, 2);
+  await complete("tok3", null, deps); // pas de second SMS pour le même filleul
+  assertEquals(toSponsor().length, 2);
+});
+
+Deno.test("SMS au parrain : 1 SMS GSM-7 dans tous les cas", () => {
+  const link = "https://relaisarti.pages.dev/testeurs?parrain=abc1234";
+  for (const n of [1, 2, 3, 4, 5, 7, 10]) {
+    const g = toGsm7(sponsorSms("Jean-Baptiste", "Marie-Christine", n, link));
+    assert(isGsm7(g), g);
+    assert(g.length <= 160, `${n} : ${g.length} ${g}`);
+  }
 });
