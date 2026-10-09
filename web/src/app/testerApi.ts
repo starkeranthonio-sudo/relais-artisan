@@ -16,7 +16,8 @@ export interface TesterState {
   surveyDone: boolean;
   answers: Record<string, string>;
   referralCode: string | null;
-  referrals: { registered: number; verified: number };
+  /** counted : filleuls allés au bout du parcours (essai fait) ; ce sont eux qui font monter les paliers. */
+  referrals: { registered: number; counted: number };
 }
 
 export class TesterError extends Error {
@@ -65,7 +66,7 @@ const post = <T>(body: Record<string, unknown>) =>
 const DEMO = "demo";
 const demoState: TesterState = {
   firstName: "Jean", businessName: "Dupont Plomberie", phone: "06 12 34 56 78", testDrivesUsed: 0, siretStatus: "none",
-  companyName: null, completed: false, surveyDone: false, answers: {}, referralCode: null, referrals: { registered: 3, verified: 2 },
+  companyName: null, completed: false, surveyDone: false, answers: {}, referralCode: null, referrals: { registered: 3, counted: 2 },
 };
 const wait = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 400));
 

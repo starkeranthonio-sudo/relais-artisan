@@ -456,10 +456,9 @@ export function supabaseProgramStore(client: SupabaseClient): ProgramStore {
       check(await client.from("testers").update({ completed_at: at.toISOString() }).eq("id", testerId).is("completed_at", null));
     },
     async referralCounts(testerId) {
-      const rows = check(
-        await client.from("testers").select("artisan:artisans(siret_verified_at)").eq("referred_by", testerId),
-      ) as unknown as { artisan: { siret_verified_at: string | null } | null }[];
-      return { registered: rows.length, verified: rows.filter((r) => r.artisan?.siret_verified_at).length };
+      // Règle unique en base (migration 20261009700000) : inscrit avec le lien + parcours terminé + essai fait.
+      const rows = check(await client.rpc("referral_counts", { p_tester: testerId })) as { registered: number; counted: number }[];
+      return rows?.[0] ?? { registered: 0, counted: 0 };
     },
     async uploadProof(path, bytes, contentType) {
       const { error } = await client.storage.from("siret-proofs").upload(path, bytes, { contentType });

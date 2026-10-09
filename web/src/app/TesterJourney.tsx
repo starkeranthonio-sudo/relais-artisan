@@ -427,9 +427,9 @@ function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterS
 
   const link = `${window.location.origin}/testeurs?parrain=${state.referralCode}`;
   const message = `Salut ! Je teste RelaisArti : quand je rate un appel sur un chantier, le client reçoit tout de suite un SMS à mon nom, et mes devis sont relancés tout seuls. Inscris-toi comme testeur avec mon lien, tu auras ${INVITEE_REWARD} : ${link}`;
-  const verified = state.referrals.verified;
-  const next = nextTier(verified);
-  const reached = currentTier(verified);
+  const count = state.referrals.counted;
+  const next = nextTier(count);
+  const reached = currentTier(count);
   const track = (channel: string) => logStep("share_clicked", state.referralCode, { channel });
 
   async function copy(what: "message" | "lien") {
@@ -455,14 +455,14 @@ function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterS
   return (
     <div className="stack">
       <h1>Invitez vos confrères</h1>
-      <p className="lead">Votre lien est personnel : chaque confrère du bâtiment qui s'inscrit avec lui et dont le SIRET est vérifié vous fait avancer.</p>
+      <p className="lead">Votre lien est personnel : chaque confrère qui s'inscrit avec lui et va au bout de son inscription vous fait avancer d'un cran.</p>
 
-      <RewardsTrack verified={verified} />
+      <RewardsTrack count={count} />
       <p className="small center-text">
-        <strong className="accent">{verified} confrère{verified > 1 ? "s" : ""} vérifié{verified > 1 ? "s" : ""}</strong>
-        {state.referrals.registered > verified && <span className="muted"> · {state.referrals.registered - verified} inscrit{state.referrals.registered - verified > 1 ? "s" : ""} en attente de SIRET</span>}
+        <strong className="accent">{count} confrère{count > 1 ? "s" : ""} inscrit{count > 1 ? "s" : ""}</strong>
+        {state.referrals.registered > count && <span className="muted"> · {state.referrals.registered - count} en cours d'inscription</span>}
         {reached && <span className="muted"> · palier atteint : {reached.title}</span>}
-        {next && <span className="muted"> · encore {next.referrals - verified} pour « {next.title} »</span>}
+        {next && <span className="muted"> · encore {next.referrals - count} pour « {next.title} »</span>}
       </p>
 
       <div className="message-preview">
@@ -550,11 +550,11 @@ function Conditions() {
       <summary>Conditions du programme</summary>
       <ul className="conditions">
         <li>Le programme est gratuit et sans engagement. Aucun paiement n'est demandé pendant la phase de test.</li>
-        <li>Un parrainage compte quand le confrère invité s'inscrit avec votre lien <strong>et</strong> que son SIRET est vérifié comme entreprise du bâtiment en activité (vérification automatique ou sur justificatif). Un seul compte par SIRET ; pas de parrainage de son propre compte.</li>
+        <li>Un parrainage compte quand le confrère invité s'inscrit avec votre lien <strong>et</strong> va au bout de son inscription, essai compris (il reçoit le SMS d'essai sur son portable, ce qui garantit un vrai numéro). Le SIRET du confrère n'est pas obligatoire. Un seul compte par numéro de portable ; pas de parrainage de son propre compte.</li>
         <li>Les avantages s'appliquent à l'ouverture commerciale du service (abonnement à {PRICE} € HT/mois), sur le compte du parrain et de l'invité. Ils ne sont ni cumulables avec une autre offre, ni échangeables contre de l'argent. Maximum : 6 mois offerts.</li>
         <li>Le tarif fondateur ({FOUNDER_PRICE} € HT/mois au lieu de {PRICE} €) est garanti 24 mois à partir de la souscription.</li>
         <li>Si le service n'ouvre pas commercialement, aucun avantage n'est dû et aucun paiement n'aura été demandé. Vous pouvez supprimer vos données à tout moment depuis votre espace testeur.</li>
-        <li>Aucun tirage au sort : les avantages dépendent uniquement du nombre de confrères vérifiés.</li>
+        <li>Aucun tirage au sort : les avantages dépendent uniquement du nombre de confrères inscrits jusqu'au bout.</li>
       </ul>
       <p className="small conditions-title">Vos données</p>
       <ul className="conditions">

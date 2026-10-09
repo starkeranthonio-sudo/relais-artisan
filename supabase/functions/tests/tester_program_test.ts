@@ -32,7 +32,7 @@ function setup() {
     markCompleted: (id, at) => ((testers.find((t) => t.id === id)!.completed_at = at.toISOString()), Promise.resolve()),
     referralCounts: (id) => {
       const kids = testers.filter((t) => referredBy.get(t.id) === id);
-      return Promise.resolve({ registered: kids.length, verified: kids.filter((k) => k.siret_status === "verified").length });
+      return Promise.resolve({ registered: kids.length, counted: kids.filter((k) => k.completed_at !== null).length });
     },
     uploadProof: (path) => (proofs.push(path), Promise.resolve()),
     logFunnel: (tester, step, session) => (funnel.push({ tester, step, session }), Promise.resolve()),
@@ -120,16 +120,17 @@ Deno.test("inscription : validations, et numéro déjà inscrit → lien renvoy�
   assertStringIncludes(sent[0].body, "/testeurs/moi/tok1");
 });
 
-Deno.test("parrainage : le code du lien rattache le filleul ; seuls les filleuls vérifiés comptent", async () => {
-  const { deps, testers, referredBy } = setup();
+Deno.test("parrainage : le code du lien rattache le filleul ; seuls ceux allés au bout comptent (sans SIRET)", async () => {
+  const { deps, referredBy } = setup();
   await register(INFO, deps);
   await register({ ...INFO, phone: "0611111111", ref: "CODE1" }, deps);
   await register({ ...INFO, phone: "0622222222", ref: "code1" }, deps);
   assertEquals(referredBy.get("t2"), "t1");
-  testers[1].siret_status = "verified";
+  await skipSiret("tok2", null, deps);
+  await complete("tok2", null, deps);
   const s = await getState("tok1", deps);
   assert(s.ok);
-  assertEquals(s.value.referrals, { registered: 2, verified: 1 });
+  assertEquals(s.value.referrals, { registered: 2, counted: 1 });
 });
 
 Deno.test("lien de parrainage seulement avec un SIRET vérifié ou une photo de devis envoyée", async () => {

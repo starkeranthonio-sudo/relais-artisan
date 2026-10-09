@@ -44,7 +44,8 @@ export interface ProgramStore {
   createTester(t: NewTester): Promise<Tester>;
   setSiretStatus(testerId: string, status: SiretStatus, proof?: { path: string; siret: string | null }): Promise<void>;
   markCompleted(testerId: string, at: Date): Promise<void>;
-  referralCounts(testerId: string): Promise<{ registered: number; verified: number }>;
+  /** Filleuls inscrits avec le lien, et filleuls « comptés » (parcours terminé avec l'essai fait). */
+  referralCounts(testerId: string): Promise<{ registered: number; counted: number }>;
   uploadProof(path: string, bytes: Uint8Array, contentType: string): Promise<void>;
   logFunnel(testerId: string, step: FunnelStep, sessionId: string | null, props?: Record<string, unknown>): Promise<void>;
   /** Suppression RGPD : fiche, demandes, messages, photo de devis. L'entonnoir ne garde que des étapes anonymes. */
@@ -140,7 +141,7 @@ export interface TesterState {
   surveyDone: boolean;
   answers: Answers;
   referralCode: string | null; // seulement si le SIRET est vérifié ou en cours de vérification manuelle
-  referrals: { registered: number; verified: number };
+  referrals: { registered: number; counted: number };
 }
 
 export async function getState(token: string, deps: ProgramDeps): Promise<Result<TesterState>> {
