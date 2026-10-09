@@ -253,3 +253,34 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .choice:disabled { opacity: 0.7; cursor: wait; }
 .contact-line { text-align: center; color: var(--text-dim); font-size: 0.8125rem; margin-top: 16px; }
 .contact-line a { color: var(--text-sec); }
+
+/* Frise des avantages du parrainage */
+.rewards { display: flex; flex-direction: column; gap: 12px; padding: 16px 12px; background: var(--subtle); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.rewards-track { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); align-items: start; }
+.rewards-track::before, .rewards-track::after {
+  content: ""; position: absolute; top: 21px; left: 12.5%; height: 3px; border-radius: 3px;
+}
+.rewards-track::before { right: 12.5%; background: var(--line-strong); }
+.rewards-track::after { width: calc((100% - 25%) * var(--fill) / 100); background: var(--accent); transition: width 0.5s ease; }
+.reward { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+.reward-circle {
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 800; font-size: 1.125rem; font-variant-numeric: tabular-nums;
+  background: var(--bg); color: var(--text-sec); border: 2px solid var(--line-strong);
+}
+.reward.next .reward-circle { border-color: var(--accent); color: var(--accent-text); box-shadow: 0 0 0 4px var(--accent-tint); }
+.reward.done .reward-circle { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.reward-label { font-size: 0.8125rem; font-weight: 700; line-height: 1.25; color: var(--text); padding: 0 2px; }
+.reward-count { font-size: 0.6875rem; color: var(--text-dim); font-weight: 600; }
+.rewards-invitee { margin: 0; text-align: center; font-size: 0.875rem; color: var(--text-sec); }
+.rewards-invitee strong { color: var(--accent-text); }
+
+/* Partage */
+.message-preview { background: var(--subtle); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; }
+.message-preview-title { font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 6px; }
+.message-preview p { margin: 0; font-size: 0.9375rem; overflow-wrap: anywhere; }
+.share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn-icon { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-icon svg { width: 20px; height: 20px; flex: none; }
+
+.siret-title { font-size: 1.25rem; margin: 10px 0 0; }

@@ -1,7 +1,8 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { toE164 } from "./format.ts";
-import { currentTier, FOUNDER_PRICE, INVITEE_REWARD, nextTier, PRICE, TIERS, TRADES } from "./founders.ts";
+import { currentTier, FOUNDER_PRICE, INVITEE_REWARD, nextTier, PRICE, TRADES } from "./founders.ts";
+import { RewardsTrack } from "./RewardsTrack.tsx";
 import { CONTACT_EMAIL, FREE_TEXT_QUESTION, SURVEY_QUESTIONS } from "./survey.ts";
 import { logStep, savedToken, TesterError, testerApi, type TesterState } from "./testerApi.ts";
 import "./app.css";
@@ -375,8 +376,11 @@ function SiretStep({ token, state, onNext }: { token: string; state: TesterState
 
   return (
     <div className="stack">
-      <h1>Votre SIRET</h1>
-      <p className="lead">Il prouve que vous êtes un vrai artisan du bâtiment. Il est nécessaire pour obtenir votre lien de parrainage et vos avantages.</p>
+      <h1>Gagnez des avantages en invitant vos confrères</h1>
+      <p className="lead">Plus vous faites inscrire de confrères du bâtiment, plus vous gagnez :</p>
+      <RewardsTrack />
+      <h2 className="siret-title">Votre SIRET</h2>
+      <p className="muted">Il prouve que vous êtes un vrai artisan du bâtiment. Il est nécessaire pour obtenir votre lien de parrainage.</p>
       <form className="stack" onSubmit={verify}>
         <label className="field">
           <span className="label">SIRET (14 chiffres)</span>
@@ -404,7 +408,7 @@ function SiretStep({ token, state, onNext }: { token: string; state: TesterState
 }
 
 function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterState; onAddSiret: () => void }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"message" | "lien" | null>(null);
 
   useEffect(() => {
     if (!state.completed) void testerApi.complete(token);
@@ -422,59 +426,79 @@ function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterS
   }
 
   const link = `${window.location.origin}/testeurs?parrain=${state.referralCode}`;
-  const message = `Je teste RelaisArti : quand je rate un appel, le client reçoit un SMS à mon nom et mes devis sont relancés tout seuls. Inscris-toi comme testeur avec mon lien (${INVITEE_REWARD} pour toi) : ${link}`;
+  const message = `Salut ! Je teste RelaisArti : quand je rate un appel sur un chantier, le client reçoit tout de suite un SMS à mon nom, et mes devis sont relancés tout seuls. Inscris-toi comme testeur avec mon lien, tu auras ${INVITEE_REWARD} : ${link}`;
   const verified = state.referrals.verified;
   const next = nextTier(verified);
   const reached = currentTier(verified);
   const track = (channel: string) => logStep("share_clicked", state.referralCode, { channel });
 
-  async function copy() {
-    track("copy");
+  async function copy(what: "message" | "lien") {
+    track(what === "lien" ? "copy_link" : "copy_message");
     try {
-      await navigator.clipboard.writeText(message);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(what === "lien" ? link : message);
+      setCopied(what);
+      setTimeout(() => setCopied(null), 2000);
     } catch {
       /* presse-papiers indisponible */
+    }
+  }
+
+  async function nativeShare() {
+    track("share_sheet");
+    try {
+      await navigator.share({ title: "RelaisArti", text: message });
+    } catch {
+      /* partage annulé */
     }
   }
 
   return (
     <div className="stack">
       <h1>Invitez vos confrères</h1>
-      <p className="lead">Chaque confrère du bâtiment qui s'inscrit avec votre lien et dont le SIRET est vérifié vous fait monter d'un palier. Il reçoit {INVITEE_REWARD}.</p>
+      <p className="lead">Votre lien est personnel : chaque confrère du bâtiment qui s'inscrit avec lui et dont le SIRET est vérifié vous fait avancer.</p>
 
+      <RewardsTrack verified={verified} />
+      <p className="small center-text">
+        <strong className="accent">{verified} confrère{verified > 1 ? "s" : ""} vérifié{verified > 1 ? "s" : ""}</strong>
+        {state.referrals.registered > verified && <span className="muted"> · {state.referrals.registered - verified} inscrit{state.referrals.registered - verified > 1 ? "s" : ""} en attente de SIRET</span>}
+        {reached && <span className="muted"> · palier atteint : {reached.title}</span>}
+        {next && <span className="muted"> · encore {next.referrals - verified} pour « {next.title} »</span>}
+      </p>
+
+      <div className="message-preview">
+        <p className="message-preview-title">Le message envoyé à vos confrères</p>
+        <p>{message}</p>
+      </div>
+
+      {"share" in navigator && (
+        <button className="btn-primary cta btn-icon" onClick={nativeShare}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Partager (WhatsApp, SMS, Messenger…)
+        </button>
+      )}
+      <div className="share-grid">
+        <a className="btn-secondary btn-icon" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" onClick={() => track("whatsapp")}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm0 18.2a8.2 8.2 0 01-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1112 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 01-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a.9.9 0 00-.7.3 2.8 2.8 0 00-.9 2.1 4.9 4.9 0 001 2.6 11.2 11.2 0 004.3 3.8c1.6.7 2.2.7 3 .6a2.6 2.6 0 001.7-1.2 2.1 2.1 0 00.1-1.2c0-.1-.2-.2-.4-.3z" /></svg>
+          WhatsApp
+        </a>
+        <a className="btn-secondary btn-icon" href={`sms:?&body=${encodeURIComponent(message)}`} onClick={() => track("sms")}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg>
+          SMS
+        </a>
+      </div>
+      <div className="share-grid">
+        <button className="btn-secondary" onClick={() => copy("message")}>{copied === "message" ? "Message copié" : "Copier le message"}</button>
+        <button className="btn-secondary" onClick={() => copy("lien")}>{copied === "lien" ? "Lien copié" : "Copier le lien"}</button>
+      </div>
       <div className="share-link"><code>{link}</code></div>
-      <div className="actions-2">
-        <a className="btn-primary" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" onClick={() => track("whatsapp")}>WhatsApp</a>
-        <a className="btn-secondary" href={`sms:?&body=${encodeURIComponent(message)}`} onClick={() => track("sms")}>SMS</a>
-      </div>
-      <button className="btn-secondary" onClick={copy}>{copied ? "Message copié" : "Copier le message"}</button>
 
-      <div className="panel">
-        <p>
-          <strong className="accent">{verified} confrère{verified > 1 ? "s" : ""} vérifié{verified > 1 ? "s" : ""}</strong>
-          {state.referrals.registered > verified && <span className="muted"> · {state.referrals.registered - verified} en attente de SIRET</span>}
-        </p>
-        <ol className="tiers">
-          {TIERS.map((t) => (
-            <li key={t.referrals} className={verified >= t.referrals ? "done" : next === t ? "next" : ""}>
-              <span className="tier-count">{t.referrals}</span>
-              <span><strong>{t.title}</strong><span className="muted small"> · {t.detail}</span></span>
-            </li>
-          ))}
-        </ol>
-        {reached && <p className="small muted">Palier atteint : {reached.title}.</p>}
-        {next && <p className="small muted">Encore {next.referrals - verified} pour « {next.title} ».</p>}
-      </div>
       {state.siretStatus === "pending_manual" && <p className="muted small">Votre SIRET est en cours de vérification : vos parrainages comptent dès maintenant.</p>}
-      <p className="muted small">Votre lien de parrainage vous est aussi envoyé par SMS par RelaisArti. Revenez sur cette page depuis ce téléphone pour suivre vos parrainages.</p>
+      <p className="muted small">Votre lien vous a aussi été envoyé par SMS par RelaisArti. Revenez sur cette page depuis ce téléphone pour suivre vos parrainages.</p>
       <Conditions />
     </div>
   );
 }
 
-/** Droit à l'effacement (RGPD) : suppression immédiate et complète, en deux clics. */
 function DeleteData({ token, onDeleted }: { token: string; onDeleted: () => void }) {
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);

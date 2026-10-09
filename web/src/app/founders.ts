@@ -8,15 +8,16 @@ export const TRADES = [
 export interface Tier {
   referrals: number; // confrères au SIRET vérifié
   title: string;
+  short: string;      // libellé court sous le cercle de la frise
   detail: string;
 }
 
 /** Avantages valables à l'ouverture commerciale. Pas d'argent, pas de « à vie » (voir les conditions). */
 export const TIERS: Tier[] = [
-  { referrals: 1, title: "Membre fondateur", detail: "Accès en avant-première et groupe WhatsApp avec le fondateur" },
-  { referrals: 3, title: "Tarif fondateur", detail: "29 € au lieu de 39 € par mois, garanti 24 mois" },
-  { referrals: 5, title: "2 mois offerts", detail: "Et la configuration faite pour vous" },
-  { referrals: 10, title: "6 mois offerts", detail: "Le maximum du programme" },
+  { referrals: 1, title: "Membre fondateur", short: "Membre fondateur", detail: "Accès en avant-première et groupe WhatsApp avec le fondateur" },
+  { referrals: 3, title: "Tarif fondateur", short: "29 €/mois garanti", detail: "29 € au lieu de 39 € par mois, garanti 24 mois" },
+  { referrals: 5, title: "2 mois offerts", short: "2 mois offerts", detail: "Et la configuration faite pour vous" },
+  { referrals: 10, title: "6 mois offerts", short: "6 mois offerts", detail: "Le maximum du programme" },
 ];
 
 /** Avantage du confrère invité (récompense des deux côtés). */
