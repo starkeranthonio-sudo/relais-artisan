@@ -459,7 +459,7 @@ function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterS
   }
 
   const link = `${window.location.origin}/testeurs?parrain=${state.referralCode}`;
-  const message = `Salut ! Je teste RelaisArti : quand je rate un appel sur un chantier, le client reçoit tout de suite un SMS à mon nom, et mes devis sont relancés tout seuls. Inscris-toi comme testeur avec mon lien, tu auras ${INVITEE_REWARD} : ${link}`;
+  const message = `Salut, je teste RelaisArti : quand tu rates un appel, le client reçoit direct un SMS à ton nom et tu ne perds plus le chantier. Teste en 3 min, avec mon lien t'as ${INVITEE_REWARD} : ${link}`;
   const count = state.referrals.counted;
   const next = nextTier(count);
   const reached = currentTier(count);
