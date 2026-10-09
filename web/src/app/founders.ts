@@ -15,7 +15,7 @@ export interface Tier {
 /** Avantages valables à l'ouverture commerciale. Pas d'argent, pas de « à vie » (voir les conditions). */
 export const TIERS: Tier[] = [
   { referrals: 1, title: "Membre fondateur", short: "Membre fondateur", detail: "Accès en avant-première et groupe WhatsApp avec le fondateur" },
-  { referrals: 3, title: "Tarif fondateur", short: "29 €/mois garanti", detail: "29 € au lieu de 39 € par mois, garanti 24 mois" },
+  { referrals: 3, title: "Tarif fondateur", short: "29 €/mois · 6 mois", detail: "29 € au lieu de 39 € par mois, pendant 6 mois" },
   { referrals: 5, title: "2 mois offerts", short: "2 mois offerts", detail: "Et la configuration faite pour vous" },
   { referrals: 10, title: "6 mois offerts", short: "6 mois offerts", detail: "Le maximum du programme" },
 ];

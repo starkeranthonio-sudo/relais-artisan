@@ -455,6 +455,12 @@ export function supabaseProgramStore(client: SupabaseClient): ProgramStore {
     async markCompleted(testerId, at) {
       check(await client.from("testers").update({ completed_at: at.toISOString() }).eq("id", testerId).is("completed_at", null));
     },
+    async hasCompletedTest(artisanId) {
+      const { count, error } = await client.from("leads").select("id", { count: "exact", head: true })
+        .eq("artisan_id", artisanId).not("form_submitted_at", "is", null);
+      if (error) throw new Error(error.message);
+      return (count ?? 0) > 0;
+    },
     async referralCounts(testerId) {
       // Règle unique en base (migration 20261009700000) : inscrit avec le lien + parcours terminé + essai fait.
       const rows = check(await client.rpc("referral_counts", { p_tester: testerId })) as { registered: number; counted: number }[];

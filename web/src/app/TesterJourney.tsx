@@ -190,7 +190,7 @@ export function TesterSpace() {
     document.title = "Mon espace testeur – RelaisArti";
     savedToken.set(token);
     reload()
-      .then((s) => setStep(s.referralCode || s.completed ? 4 : s.surveyDone ? 3 : s.testDrivesUsed > 0 ? 2 : 1))
+      .then((s) => setStep(s.referralCode || s.completed ? 4 : s.surveyDone ? 3 : s.testCompleted ? 2 : 1))
       .catch((e) => setError(e instanceof TesterError ? e.message : "Page indisponible."));
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -222,8 +222,19 @@ export function TesterSpace() {
 
 function TestStep({ token, state, onNext }: { token: string; state: TesterState; onNext: () => void }) {
   const [sent, setSent] = useState(state.testDrivesUsed > 0);
+  const [done, setDone] = useState(state.testCompleted);
+  const [used, setUsed] = useState(state.testDrivesUsed);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tant que la demande d'essai n'est pas remplie, on vérifie toutes les 4 s (la page se débloque toute seule).
+  useEffect(() => {
+    if (!sent || done) return;
+    const id = setInterval(() => {
+      testerApi.state(token).then((s) => s.testCompleted && setDone(true)).catch(() => {});
+    }, 4000);
+    return () => clearInterval(id);
+  }, [sent, done, token]);
 
   async function send() {
     setBusy(true);
@@ -231,6 +242,7 @@ function TestStep({ token, state, onNext }: { token: string; state: TesterState;
     try {
       await testerApi.testDrive(token);
       setSent(true);
+      setUsed((u) => u + 1);
     } catch (err) {
       setError(err instanceof TesterError ? err.message : "Envoi impossible. Réessayez.");
     } finally {
@@ -238,24 +250,45 @@ function TestStep({ token, state, onNext }: { token: string; state: TesterState;
     }
   }
 
+  if (done) {
+    return (
+      <div className="stack">
+        <div className="success-box">
+          <p className="success-title">Essai réussi, votre numéro est confirmé</p>
+          <p>Vous avez vu ce que reçoivent vos clients, et vous avez reçu « Nouvelle demande » : c'est ce qui arrivera à chaque appel manqué.</p>
+        </div>
+        <button className="btn-primary cta" onClick={onNext}>Suivant</button>
+      </div>
+    );
+  }
+
   return (
     <div className="stack">
       <h1>{state.firstName}, vivez l'essai</h1>
       <p className="lead">On simule un appel manqué d'un de vos clients. Vous allez voir exactement ce qu'il reçoit, puis ce que vous recevez.</p>
-      <ol className="how">
-        <li>Vous recevez <strong>le SMS envoyé à vos clients</strong>. Il arrive au nom de votre entreprise ({state.businessName}), comme pour eux.</li>
-        <li>Touchez le lien et <strong>décrivez un besoin comme si vous étiez le client</strong> (une fuite, une panne…).</li>
-        <li>Une minute après, vous recevez <strong>« Nouvelle demande »</strong> : c'est ce que vous recevrez à chaque appel manqué.</li>
-      </ol>
-      {sent ? (
-        <p className="success">SMS envoyé au {state.phone}. Ouvrez-le et suivez le lien.</p>
-      ) : (
+
+      <div className="important">
+        <p className="important-title">Important pour valider votre inscription</p>
+        <p>
+          Vous allez recevoir un SMS au nom de <strong>{state.businessName}</strong>. <strong>Ouvrez-le, touchez le lien et remplissez la demande</strong> comme
+          si vous étiez le client (une fuite, une panne…). C'est ce qui confirme votre numéro et valide votre inscription
+          {" "}— et la fait compter pour le confrère qui vous a invité.
+        </p>
+      </div>
+
+      {!sent ? (
         <button className="btn-primary cta" onClick={send} disabled={busy}>{busy ? "Envoi…" : "Recevoir l'essai sur mon portable"}</button>
+      ) : (
+        <>
+          <div className="waiting" role="status">
+            <span className="spinner" aria-hidden="true" />
+            <span>SMS envoyé au {state.phone}. En attente de votre demande… cette page se débloque toute seule.</span>
+          </div>
+          {used < 3 && <button className="btn-secondary" onClick={send} disabled={busy}>{busy ? "Envoi…" : "Je n'ai rien reçu : renvoyer le SMS"}</button>}
+          {used >= 3 && <p className="muted small">Toujours rien reçu ? Écrivez-moi à {CONTACT_EMAIL}, je valide votre inscription.</p>}
+        </>
       )}
       {error && <p className="error">{error}</p>}
-      {sent && <button className="btn-primary cta" onClick={onNext}>J'ai fait l'essai : suivant</button>}
-      {sent && state.testDrivesUsed < 3 && <button className="btn-ghost" onClick={send} disabled={busy}>Renvoyer le SMS d'essai</button>}
-      {!sent && <button className="btn-ghost" onClick={onNext}>Passer cette étape</button>}
     </div>
   );
 }
@@ -552,7 +585,7 @@ function Conditions() {
         <li>Le programme est gratuit et sans engagement. Aucun paiement n'est demandé pendant la phase de test.</li>
         <li>Un parrainage compte quand le confrère invité s'inscrit avec votre lien <strong>et</strong> va au bout de son inscription, essai compris (il reçoit le SMS d'essai sur son portable, ce qui garantit un vrai numéro). Le SIRET du confrère n'est pas obligatoire. Un seul compte par numéro de portable ; pas de parrainage de son propre compte.</li>
         <li>Les avantages s'appliquent à l'ouverture commerciale du service (abonnement à {PRICE} € HT/mois), sur le compte du parrain et de l'invité. Ils ne sont ni cumulables avec une autre offre, ni échangeables contre de l'argent. Maximum : 6 mois offerts.</li>
-        <li>Le tarif fondateur ({FOUNDER_PRICE} € HT/mois au lieu de {PRICE} €) est garanti 24 mois à partir de la souscription.</li>
+        <li>Le tarif fondateur ({FOUNDER_PRICE} € HT/mois au lieu de {PRICE} €) s'applique pendant 6 mois à partir de la souscription.</li>
         <li>Si le service n'ouvre pas commercialement, aucun avantage n'est dû et aucun paiement n'aura été demandé. Vous pouvez supprimer vos données à tout moment depuis votre espace testeur.</li>
         <li>Aucun tirage au sort : les avantages dépendent uniquement du nombre de confrères inscrits jusqu'au bout.</li>
       </ul>

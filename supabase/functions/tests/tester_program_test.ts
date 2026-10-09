@@ -11,6 +11,7 @@ function setup() {
   const funnel: { tester: string; step: string; session: string | null }[] = [];
   const sent: { to: string; body: string }[] = [];
   const proofs: string[] = [];
+  const completedTests = new Set<string>();
   let n = 0;
 
   const store: ProgramStore = {
@@ -30,6 +31,7 @@ function setup() {
     },
     setSiretStatus: (id, status) => ((testers.find((t) => t.id === id)!.siret_status = status), Promise.resolve()),
     markCompleted: (id, at) => ((testers.find((t) => t.id === id)!.completed_at = at.toISOString()), Promise.resolve()),
+    hasCompletedTest: (artisanId) => Promise.resolve(completedTests.has(artisanId)),
     referralCounts: (id) => {
       const kids = testers.filter((t) => referredBy.get(t.id) === id);
       return Promise.resolve({ registered: kids.length, counted: kids.filter((k) => k.completed_at !== null).length });
@@ -69,7 +71,7 @@ function setup() {
     appUrl: "https://relaisarti.fr",
     newToken: () => `tok${++tok}`,
   };
-  return { deps, testers, funnel, sent, proofs, referredBy };
+  return { deps, testers, funnel, sent, proofs, referredBy, completedTests };
 }
 
 const INFO = { businessName: "Dupont Plomberie", firstName: "Jean", lastName: "Dupont", phone: "06 12 34 56 78", trade: "Plombier", postalCode: "78140", sessionId: "session-123" };
@@ -209,4 +211,15 @@ Deno.test("questions : chaque réponse enregistrée et tracée ; réponse hors l
   assertEquals(funnel.filter((f) => f.step === "survey_completed").length, 1);
   const s = await getState("tok1", deps);
   assert(s.ok && s.value.surveyDone && s.value.answers.would_pay === "yes_launch");
+});
+
+Deno.test("état : « essai fait » seulement quand la demande d'essai a été remplie", async () => {
+  const { deps, completedTests } = setup();
+  await register(INFO, deps);
+  await testDrive("tok1", null, deps);
+  const before = await getState("tok1", deps);
+  assert(before.ok && before.value.testDrivesUsed === 1 && before.value.testCompleted === false);
+  completedTests.add("a1");
+  const after = await getState("tok1", deps);
+  assert(after.ok && after.value.testCompleted === true);
 });

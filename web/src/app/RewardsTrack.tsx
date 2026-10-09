@@ -35,7 +35,7 @@ export function RewardsTrack({ count = 0, showInvitee = true }: { count?: number
           );
         })}
       </div>
-      {showInvitee && <p className="rewards-invitee">Et chaque confrère invité reçoit <strong>{INVITEE_REWARD}</strong>.</p>}
+      {showInvitee && <p className="rewards-invitee">Votre confrère, lui, reçoit <strong>{INVITEE_REWARD}</strong> en s'inscrivant avec votre lien.</p>}
     </div>
   );
 }

@@ -10,6 +10,8 @@ export interface TesterState {
   businessName: string;
   phone: string;
   testDrivesUsed: number;
+  /** Demande d'essai remplie depuis le SMS : prouve que le numéro est réel ; nécessaire pour avancer. */
+  testCompleted: boolean;
   siretStatus: SiretStatus;
   companyName: string | null;
   completed: boolean;
@@ -65,7 +67,7 @@ const post = <T>(body: Record<string, unknown>) =>
 /** /testeurs/moi/demo : parcours de démonstration, sans appel au serveur ni SMS. */
 const DEMO = "demo";
 const demoState: TesterState = {
-  firstName: "Jean", businessName: "Dupont Plomberie", phone: "06 12 34 56 78", testDrivesUsed: 0, siretStatus: "none",
+  firstName: "Jean", businessName: "Dupont Plomberie", phone: "06 12 34 56 78", testDrivesUsed: 0, testCompleted: false, siretStatus: "none",
   companyName: null, completed: false, surveyDone: false, answers: {}, referralCode: null, referrals: { registered: 3, counted: 2 },
 };
 const wait = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 400));
@@ -93,7 +95,12 @@ const realApi = {
 export const testerApi: typeof realApi = {
   ...realApi,
   state: (t) => (t === DEMO ? wait({ ...demoState }) : realApi.state(t)),
-  testDrive: (t) => (t === DEMO ? wait((demoState.testDrivesUsed++, {})) : realApi.testDrive(t)),
+  testDrive: (t) => {
+    if (t !== DEMO) return realApi.testDrive(t);
+    demoState.testDrivesUsed++;
+    setTimeout(() => (demoState.testCompleted = true), 3000); // démo : la « demande » est remplie 3 s plus tard
+    return wait({});
+  },
   verifySiret: (t, siret) => {
     if (t !== DEMO) return realApi.verifySiret(t, siret);
     if (siret.replace(/\s/g, "") !== "92759307900050") {

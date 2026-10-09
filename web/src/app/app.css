@@ -284,3 +284,15 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .btn-icon svg { width: 20px; height: 20px; flex: none; }
 
 .siret-title { font-size: 1.25rem; margin: 10px 0 0; }
+
+/* Essai : consigne mise en évidence, attente, réussite */
+.important { border: 2px solid var(--accent); background: var(--accent-tint); border-radius: var(--radius-md); padding: 14px 16px; }
+.important-title { margin: 0 0 6px; font-weight: 800; color: var(--accent-text); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.8125rem; }
+.important p { margin: 0; }
+.waiting { display: flex; gap: 12px; align-items: center; background: var(--subtle); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px 16px; color: var(--text-sec); }
+.spinner { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--line-strong); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+.success-box { border: 1px solid var(--success); border-radius: var(--radius-md); padding: 14px 16px; }
+.success-title { margin: 0 0 6px; font-weight: 800; color: var(--success); }
+.success-box p:last-child { margin: 0; color: var(--text-sec); }

@@ -45,6 +45,8 @@ export interface ProgramStore {
   setSiretStatus(testerId: string, status: SiretStatus, proof?: { path: string; siret: string | null }): Promise<void>;
   markCompleted(testerId: string, at: Date): Promise<void>;
   /** Filleuls inscrits avec le lien, et filleuls « comptés » (parcours terminé avec l'essai fait). */
+  /** L'essai est-il fait (demande remplie depuis le SMS reçu sur son portable) ? */
+  hasCompletedTest(artisanId: string): Promise<boolean>;
   referralCounts(testerId: string): Promise<{ registered: number; counted: number }>;
   uploadProof(path: string, bytes: Uint8Array, contentType: string): Promise<void>;
   logFunnel(testerId: string, step: FunnelStep, sessionId: string | null, props?: Record<string, unknown>): Promise<void>;
@@ -135,6 +137,7 @@ export interface TesterState {
   businessName: string;
   phone: string;
   testDrivesUsed: number;
+  testCompleted: boolean;
   siretStatus: SiretStatus;
   companyName: string | null;
   completed: boolean;
@@ -155,6 +158,7 @@ export async function getState(token: string, deps: ProgramDeps): Promise<Result
       businessName: t.artisan.business_name,
       phone: formatFrench(t.artisan.owner_phone),
       testDrivesUsed: t.artisan.test_drives_used,
+      testCompleted: await deps.store.hasCompletedTest(t.artisan.id),
       siretStatus: t.siret_status,
       companyName: t.artisan.siret_company_name,
       completed: t.completed_at !== null,
