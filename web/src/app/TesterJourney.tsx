@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { toE164 } from "./format.ts";
 import { currentTier, FOUNDER_PRICE, INVITEE_REWARD, nextTier, PRICE, TIERS, TRADES } from "./founders.ts";
+import { CONTACT_EMAIL, FREE_TEXT_QUESTION, SURVEY_QUESTIONS } from "./survey.ts";
 import { logStep, savedToken, TesterError, testerApi, type TesterState } from "./testerApi.ts";
 import "./app.css";
 
@@ -10,10 +11,21 @@ import "./app.css";
  * /testeurs : présentation → infos ; /testeurs/moi/<jeton> : essai → SIRET → lien de parrainage.
  */
 
-const STEPS = ["Infos", "Essai", "SIRET", "Partage"];
+const STEPS = ["Infos", "Essai", "Questions", "SIRET", "Partage"];
 
+/** Barre d'avancement : pourcentage + étapes, avec un mot d'encouragement. */
 function Progress({ current }: { current: number }) {
+  const left = STEPS.length - 1 - current;
+  const pct = Math.round(((current + 0.5) / STEPS.length) * 100);
   return (
+    <div className="progress-wrap">
+      <div className="progress-head">
+        <span>Étape {current + 1} sur {STEPS.length}</span>
+        <span className="accent">{left === 0 ? "Dernière étape !" : left === 1 ? "Plus qu'une étape !" : `Plus que ${left} étapes`}</span>
+      </div>
+      <div className="progress-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <span style={{ width: `${pct}%` }} />
+      </div>
     <ol className="stepper" aria-label="Étapes">
       {STEPS.map((s, i) => (
         <li key={s} className={i < current ? "done" : i === current ? "current" : ""} aria-current={i === current ? "step" : undefined}>
@@ -22,6 +34,7 @@ function Progress({ current }: { current: number }) {
         </li>
       ))}
     </ol>
+    </div>
   );
 }
 
@@ -69,6 +82,7 @@ export function TesterLanding() {
       ) : (
         <InfoStep referral={ref} onBack={() => setStep("intro")} />
       )}
+      <ContactLine />
     </main>
   );
 }
@@ -162,7 +176,7 @@ export function TesterSpace() {
   const { token = "" } = useParams();
   const [state, setState] = useState<TesterState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<1 | 2 | 3 | null>(null);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | null>(null);
   const [deleted, setDeleted] = useState(false);
 
   const reload = () =>
@@ -175,7 +189,7 @@ export function TesterSpace() {
     document.title = "Mon espace testeur – RelaisArti";
     savedToken.set(token);
     reload()
-      .then((s) => setStep(s.referralCode || s.completed ? 3 : s.testDrivesUsed > 0 ? 2 : 1))
+      .then((s) => setStep(s.referralCode || s.completed ? 4 : s.surveyDone ? 3 : s.testDrivesUsed > 0 ? 2 : 1))
       .catch((e) => setError(e instanceof TesterError ? e.message : "Page indisponible."));
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -196,9 +210,11 @@ export function TesterSpace() {
       <p className="eyebrow">RelaisArti · {state.businessName}</p>
       <Progress current={step} />
       {step === 1 && <TestStep token={token} state={state} onNext={() => reload().then(() => setStep(2))} />}
-      {step === 2 && <SiretStep token={token} state={state} onNext={() => reload().then(() => setStep(3))} />}
-      {step === 3 && <ShareStep token={token} state={state} onAddSiret={() => setStep(2)} />}
+      {step === 2 && <SurveyStep token={token} state={state} onNext={() => reload().then(() => setStep(3))} />}
+      {step === 3 && <SiretStep token={token} state={state} onNext={() => reload().then(() => setStep(4))} />}
+      {step === 4 && <ShareStep token={token} state={state} onAddSiret={() => setStep(3)} />}
       <DeleteData token={token} onDeleted={() => setDeleted(true)} />
+      <ContactLine />
     </main>
   );
 }
@@ -239,6 +255,74 @@ function TestStep({ token, state, onNext }: { token: string; state: TesterState;
       {sent && <button className="btn-primary cta" onClick={onNext}>J'ai fait l'essai : suivant</button>}
       {sent && state.testDrivesUsed < 3 && <button className="btn-ghost" onClick={send} disabled={busy}>Renvoyer le SMS d'essai</button>}
       {!sent && <button className="btn-ghost" onClick={onNext}>Passer cette étape</button>}
+    </div>
+  );
+}
+
+/** Questions de qualification : une par écran, réponse en un clic, enregistrée tout de suite. */
+function SurveyStep({ token, state, onNext }: { token: string; state: TesterState; onNext: () => void }) {
+  const total = SURVEY_QUESTIONS.length + 1; // + la question libre
+  const firstUnanswered = SURVEY_QUESTIONS.findIndex((q) => !state.answers[q.id]);
+  const [index, setIndex] = useState(firstUnanswered === -1 ? SURVEY_QUESTIONS.length : firstUnanswered);
+  const [answers, setAnswers] = useState<Record<string, string>>(state.answers);
+  const [text, setText] = useState(state.answers.free_text ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function choose(qId: string, value: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await testerApi.answer(token, qId, value);
+      setAnswers({ ...answers, [qId]: value });
+      setIndex(index + 1);
+    } catch (err) {
+      setError(err instanceof TesterError ? err.message : "Réponse non enregistrée. Réessayez.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function finish() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (text.trim()) await testerApi.answer(token, "free_text", text.trim().slice(0, 500));
+      await testerApi.finishSurvey(token);
+      onNext();
+    } catch (err) {
+      setError(err instanceof TesterError ? err.message : "Envoi impossible. Réessayez.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const q = SURVEY_QUESTIONS[index];
+  return (
+    <div className="stack">
+      <p className="eyebrow">Question {Math.min(index + 1, total)} sur {total}</p>
+      {q ? (
+        <>
+          <h1 className="question">{q.title}</h1>
+          {q.hint && <p className="muted small">{q.hint}</p>}
+          <div className="choices">
+            {q.options.map((o) => (
+              <button key={o.value} className={`choice${answers[q.id] === o.value ? " selected" : ""}`} disabled={busy} onClick={() => choose(q.id, o.value)}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <h1 className="question">{FREE_TEXT_QUESTION}</h1>
+          <p className="muted small">Facultatif, mais votre avis nous aide énormément.</p>
+          <textarea rows={4} maxLength={500} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ex. : que ça marche avec mon numéro actuel, un prix plus bas, une appli…" />
+          <button className="btn-primary cta" disabled={busy} onClick={finish}>{busy ? "Envoi…" : "Terminer les questions"}</button>
+        </>
+      )}
+      {error && <p className="error">{error}</p>}
+      {index > 0 && <button className="btn-ghost" disabled={busy} onClick={() => setIndex(index - 1)}>Question précédente</button>}
     </div>
   );
 }
@@ -428,6 +512,14 @@ function DeleteData({ token, onDeleted }: { token: string; onDeleted: () => void
   );
 }
 
+function ContactLine() {
+  return (
+    <p className="contact-line">
+      Une question ? Écrivez-moi : <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+    </p>
+  );
+}
+
 function Conditions() {
   return (
     <details className="conditions-box" id="conditions">
@@ -445,7 +537,7 @@ function Conditions() {
         <li><strong>Ce que nous collectons</strong> : nom de l'entreprise, prénom, nom, portable, métier et code postal (facultatifs), SIRET et, si besoin, la photo d'un devis ; la demande que vous remplissez pendant l'essai.</li>
         <li><strong>Pourquoi</strong> : faire fonctionner l'essai, vérifier que vous êtes artisan du bâtiment, compter vos parrainages, et vous prévenir de l'ouverture. Aucune revente, aucune publicité de tiers.</li>
         <li><strong>Combien de temps</strong> : pendant le programme de test, puis 12 mois après l'ouverture si vous ne devenez pas client.</li>
-        <li><strong>Vos droits</strong> : vous pouvez supprimer toutes vos données à tout moment avec le bouton « Supprimer mes données » de votre espace testeur.</li>
+        <li><strong>Vos droits</strong> : vous pouvez supprimer toutes vos données à tout moment avec le bouton « Supprimer mes données » de votre espace testeur, ou demander l'accès, la correction ou la suppression par email à {CONTACT_EMAIL}.</li>
       </ul>
     </details>
   );

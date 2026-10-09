@@ -129,7 +129,7 @@ Le SMS « Nouvelle demande » utilise un lien court `/app/l/<jeton>` (moins de c
 
 ## Parcours testeurs RelaisArti (sans compte) ✅
 
-`/testeurs` (lien de parrainage : `/testeurs?parrain=<code>`) : présentation et fonctionnalités → **Infos** (entreprise, prénom, nom, portable ; métier et code postal facultatifs) → espace personnel `/testeurs/moi/<jeton>` (lien envoyé par SMS) : **Essai** (appel manqué simulé, le numéro relais n'est jamais montré ; le SMS « Nouvelle demande » ouvre `/essai/<jeton>`) → **SIRET** (vérification automatique, ou photo d'un devis → vérification manuelle) → **Partage** (lien, WhatsApp, SMS, copie ; paliers 1/3/5/10 ; seuls les filleuls au SIRET vérifié comptent). Démo : `/testeurs/moi/demo`. Prix affiché : 39 € HT/mois (tarif fondateur 29 €).
+`/testeurs` (lien de parrainage : `/testeurs?parrain=<code>`) : présentation et fonctionnalités → **Infos** (entreprise, prénom, nom, portable ; métier et code postal facultatifs) → **Questions** (5 questions en un clic + 1 libre ; niveau d'intérêt chaud / tiède / froid ; chaque réponse tracée) → espace personnel `/testeurs/moi/<jeton>` (lien envoyé par SMS) : **Essai** (appel manqué simulé, le numéro relais n'est jamais montré ; le SMS « Nouvelle demande » ouvre `/essai/<jeton>`) → **SIRET** (vérification automatique, ou photo d'un devis → vérification manuelle) → **Partage** (lien, WhatsApp, SMS, copie ; paliers 1/3/5/10 ; seuls les filleuls au SIRET vérifié comptent). Démo : `/testeurs/moi/demo`. Prix affiché : 39 € HT/mois (tarif fondateur 29 €).
 
 Suivi (SQL Editor) :
 ```sql
@@ -137,7 +137,8 @@ select * from analytics_testers_funnel;   -- où les gens s'arrêtent (visiteurs
 select * from analytics_testers;          -- chaque testeur : avancement, filleuls, clics sur son lien
 select * from admin_siret_pending;        -- photos de devis à vérifier (bucket Storage « siret-proofs »)
 select public.admin_validate_siret('<tester_id>', true, 'NOM OFFICIEL');  -- valider (false = refuser)
-select * from launch_contacts;            -- testeurs à prévenir à l'ouverture (exporter en CSV)
+select * from launch_contacts;            -- testeurs à prévenir à l'ouverture, les « chauds » en premier (exporter en CSV)
+select * from analytics_survey;           -- répartition des réponses, question par question
 ```
 
 RGPD : chaque testeur peut supprimer toutes ses données depuis son espace (« Supprimer mes données ») : fiche, demande d'essai, messages, photos ; l'entonnoir ne garde que des étapes anonymes. Texte « Vos données » dans les conditions (collecte, finalités, durée : 12 mois après l'ouverture hors clients, droits).

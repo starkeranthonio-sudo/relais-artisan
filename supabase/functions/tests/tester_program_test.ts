@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
-  checkSiret, complete, deleteTester, getState, personalLinkSms, type ProgramDeps, referralLinkSms, thankYouSms, type ProgramStore, register, sendProof, skipSiret, type Tester, testDrive,
+  answerQuestion, checkSiret, complete, deleteTester, finishSurvey, getState, personalLinkSms, type ProgramDeps, referralLinkSms, thankYouSms, type ProgramStore, register, sendProof, skipSiret, type Tester, testDrive,
 } from "../_shared/tester-program.ts";
 import type { TesterDeps } from "../_shared/testers.ts";
 import { isGsm7, toGsm7 } from "../_shared/twilio.ts";
@@ -21,7 +21,7 @@ function setup() {
       n++;
       const t: Tester = {
         id: `t${n}`, token: nt.token, referral_code: `code${n}`, first_name: nt.firstName, last_name: nt.lastName,
-        siret_status: "none", completed_at: null,
+        siret_status: "none", completed_at: null, survey: {}, survey_completed_at: null,
         artisan: { id: `a${n}`, business_name: nt.businessName, owner_phone: nt.phone, relay_number: null, siret: null, test_drives_used: 0, siret_company_name: null },
       };
       testers.push(t);
@@ -36,6 +36,13 @@ function setup() {
     },
     uploadProof: (path) => (proofs.push(path), Promise.resolve()),
     logFunnel: (tester, step, session) => (funnel.push({ tester, step, session }), Promise.resolve()),
+    saveAnswers: (id, a) => ((testers.find((t) => t.id === id)!.survey = a), Promise.resolve()),
+    completeSurvey: (id, interest, at) => {
+      const t = testers.find((x) => x.id === id)! as Tester & { interest?: string };
+      t.survey_completed_at = at.toISOString();
+      t.interest = interest;
+      return Promise.resolve();
+    },
     deleteTester: (id) => (testers.splice(testers.findIndex((t) => t.id === id), 1), Promise.resolve()),
   };
   const testerDeps: TesterDeps = {
@@ -182,4 +189,23 @@ Deno.test("suppression des données : le lien ne fonctionne plus ensuite", async
   assertEquals(testers.length, 0);
   assertEquals((await getState("tok1", deps)).ok, false);
   assertEquals((await deleteTester("tok1", deps)).ok, false);
+});
+
+Deno.test("questions : chaque réponse enregistrée et tracée ; réponse hors liste refusée ; fin seulement si tout est répondu", async () => {
+  const { deps, funnel, testers } = setup();
+  await register(INFO, deps);
+  assert(!(await answerQuestion("tok1", "missed_calls", "beaucoup", null, deps)).ok, "valeur hors liste");
+  assert(!(await answerQuestion("tok1", "inconnue", "1-2", null, deps)).ok, "question inconnue");
+  assert((await answerQuestion("tok1", "missed_calls", "6-10", "s1", deps)).ok);
+  assert(!(await finishSurvey("tok1", null, deps)).ok, "pas fini");
+  for (const [q, v] of [["after_miss", "forget"], ["quotes_per_month", "6-15"], ["follow_up", "rarely"], ["would_pay", "yes_launch"], ["free_text", "Un appel test gratuit"]]) {
+    assert((await answerQuestion("tok1", q, v, "s1", deps)).ok, q);
+  }
+  const done = await finishSurvey("tok1", null, deps);
+  assert(done.ok && done.value.interest === "chaud");
+  assertEquals(testers[0].survey.missed_calls, "6-10");
+  assertEquals(funnel.filter((f) => f.step === "survey_answer").length, 6);
+  assertEquals(funnel.filter((f) => f.step === "survey_completed").length, 1);
+  const s = await getState("tok1", deps);
+  assert(s.ok && s.value.surveyDone && s.value.answers.would_pay === "yes_launch");
 });

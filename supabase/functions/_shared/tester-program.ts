@@ -1,6 +1,7 @@
 import { randomToken } from "./missed-call.ts";
 import { formatFrench, toE164 } from "./phone.ts";
 import { type Result, startTestDrive, type TesterArtisan, type TesterDeps, verifySiret } from "./testers.ts";
+import { type Answers, interestOf, isComplete, isValidAnswer } from "./survey.ts";
 import type { SendSms } from "./twilio.ts";
 
 /**
@@ -9,7 +10,8 @@ import type { SendSms } from "./twilio.ts";
  */
 
 export type SiretStatus = "none" | "verified" | "pending_manual" | "rejected";
-export type FunnelStep = "info_submitted" | "test_sent" | "siret_verified" | "siret_manual" | "siret_skipped" | "completed";
+export type FunnelStep =
+  | "info_submitted" | "test_sent" | "survey_answer" | "survey_completed" | "siret_verified" | "siret_manual" | "siret_skipped" | "completed";
 
 export interface Tester {
   id: string;
@@ -19,6 +21,8 @@ export interface Tester {
   last_name: string;
   siret_status: SiretStatus;
   completed_at: string | null;
+  survey: Answers;
+  survey_completed_at: string | null;
   artisan: TesterArtisan & { test_drives_used: number; siret_company_name: string | null };
 }
 
@@ -45,6 +49,8 @@ export interface ProgramStore {
   logFunnel(testerId: string, step: FunnelStep, sessionId: string | null, props?: Record<string, unknown>): Promise<void>;
   /** Suppression RGPD : fiche, demandes, messages, photo de devis. L'entonnoir ne garde que des étapes anonymes. */
   deleteTester(testerId: string): Promise<void>;
+  saveAnswers(testerId: string, answers: Answers): Promise<void>;
+  completeSurvey(testerId: string, interest: "chaud" | "tiede" | "froid", at: Date): Promise<void>;
 }
 
 export interface ProgramDeps {
@@ -131,6 +137,8 @@ export interface TesterState {
   siretStatus: SiretStatus;
   companyName: string | null;
   completed: boolean;
+  surveyDone: boolean;
+  answers: Answers;
   referralCode: string | null; // seulement si le SIRET est vérifié ou en cours de vérification manuelle
   referrals: { registered: number; verified: number };
 }
@@ -149,6 +157,8 @@ export async function getState(token: string, deps: ProgramDeps): Promise<Result
       siretStatus: t.siret_status,
       companyName: t.artisan.siret_company_name,
       completed: t.completed_at !== null,
+      surveyDone: t.survey_completed_at !== null,
+      answers: t.survey ?? {},
       referralCode: canRefer ? t.referral_code : null,
       referrals: await deps.store.referralCounts(t.id),
     },
@@ -219,6 +229,31 @@ export async function complete(token: string, sessionId: unknown, deps: ProgramD
 /** Parcours déjà terminé sans SIRET, puis SIRET ajouté : le lien de parrainage arrive par SMS. */
 async function sendReferralIfAlreadyDone(t: Tester, deps: ProgramDeps) {
   if (t.completed_at) await sendQuietly(deps, t.artisan.owner_phone, referralLinkSms(t.first_name, referralLink(deps.appUrl, t.referral_code)));
+}
+
+/** Une réponse aux questions : enregistrée tout de suite (on voit où les gens abandonnent). */
+export async function answerQuestion(token: string, q: unknown, value: unknown, sessionId: unknown, deps: ProgramDeps): Promise<Result<null>> {
+  const t = await deps.store.findByToken(token);
+  if (!t) return fail(404, "Lien invalide.");
+  const key = String(q ?? "");
+  const v = typeof value === "string" ? value.trim() : "";
+  if (!isValidAnswer(key, v)) return fail(400, "Réponse invalide.");
+  await deps.store.saveAnswers(t.id, { ...(t.survey ?? {}), [key]: v });
+  await deps.store.logFunnel(t.id, "survey_answer", sessionOf(sessionId), { q: key });
+  return { ok: true, value: null };
+}
+
+/** Fin des questions : calcul du niveau d'intérêt (chaud / tiède / froid). */
+export async function finishSurvey(token: string, sessionId: unknown, deps: ProgramDeps): Promise<Result<{ interest: string }>> {
+  const t = await deps.store.findByToken(token);
+  if (!t) return fail(404, "Lien invalide.");
+  if (!isComplete(t.survey ?? {})) return fail(400, "Répondez à toutes les questions.");
+  const interest = interestOf(t.survey);
+  if (!t.survey_completed_at) {
+    await deps.store.completeSurvey(t.id, interest, (deps.now ?? (() => new Date()))());
+    await deps.store.logFunnel(t.id, "survey_completed", sessionOf(sessionId), { interest });
+  }
+  return { ok: true, value: { interest } };
 }
 
 /** Droit à l'effacement : le testeur supprime lui-même toutes ses données depuis son espace. */

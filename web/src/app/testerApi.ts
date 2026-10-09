@@ -13,6 +13,8 @@ export interface TesterState {
   siretStatus: SiretStatus;
   companyName: string | null;
   completed: boolean;
+  surveyDone: boolean;
+  answers: Record<string, string>;
   referralCode: string | null;
   referrals: { registered: number; verified: number };
 }
@@ -63,7 +65,7 @@ const post = <T>(body: Record<string, unknown>) =>
 const DEMO = "demo";
 const demoState: TesterState = {
   firstName: "Jean", businessName: "Dupont Plomberie", phone: "06 12 34 56 78", testDrivesUsed: 0, siretStatus: "none",
-  companyName: null, completed: false, referralCode: null, referrals: { registered: 3, verified: 2 },
+  companyName: null, completed: false, surveyDone: false, answers: {}, referralCode: null, referrals: { registered: 3, verified: 2 },
 };
 const wait = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 400));
 
@@ -75,6 +77,8 @@ const realApi = {
   skipSiret: (t: string) => post({ action: "skip_siret", t }),
   complete: (t: string) => post({ action: "complete", t }),
   remove: (t: string) => post({ action: "delete", t }),
+  answer: (t: string, q: string, value: string) => post({ action: "answer", t, q, value }),
+  finishSurvey: (t: string) => post<{ interest: string }>({ action: "finish_survey", t }),
   sendProof: (t: string, siret: string, file: File) => {
     const form = new FormData();
     form.set("t", t);
@@ -102,6 +106,8 @@ export const testerApi: typeof realApi = {
   skipSiret: (t) => (t === DEMO ? wait({}) : realApi.skipSiret(t)),
   complete: (t) => (t === DEMO ? wait((demoState.completed = true, {})) : realApi.complete(t)),
   remove: (t) => (t === DEMO ? wait({}) : realApi.remove(t)),
+  answer: (t, q, value) => (t === DEMO ? wait((demoState.answers = { ...demoState.answers, [q]: value }, {})) : realApi.answer(t, q, value)),
+  finishSurvey: (t) => (t === DEMO ? wait((demoState.surveyDone = true, { interest: "chaud" })) : realApi.finishSurvey(t)),
 };
 
 const TOKEN_KEY = "ra_tester_token";

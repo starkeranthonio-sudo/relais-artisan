@@ -408,7 +408,7 @@ export function supabaseTesterStore(client: SupabaseClient): TesterStore {
 }
 
 const TESTER_SELECT =
-  "id, token, referral_code, first_name, last_name, siret_status, completed_at, " +
+  "id, token, referral_code, first_name, last_name, siret_status, completed_at, survey, survey_completed_at, " +
   "artisan:artisans(id, business_name, owner_phone, relay_number, sms_sender, client_sms_template, siret, test_drives_used, siret_company_name)";
 
 /** Implémentation Supabase du ProgramStore (parcours testeurs sans compte). */
@@ -467,6 +467,12 @@ export function supabaseProgramStore(client: SupabaseClient): ProgramStore {
     },
     async logFunnel(testerId, step, sessionId, props = {}) {
       check(await client.from("funnel_events").insert({ tester_id: testerId, step, session_id: sessionId ?? `tester-${testerId}`, props }));
+    },
+    async saveAnswers(testerId, answers) {
+      check(await client.from("testers").update({ survey: answers }).eq("id", testerId));
+    },
+    async completeSurvey(testerId, interest, at) {
+      check(await client.from("testers").update({ interest, survey_completed_at: at.toISOString() }).eq("id", testerId).is("survey_completed_at", null));
     },
     async deleteTester(testerId) {
       const t = check(await client.from("testers").select("artisan_id").eq("id", testerId).single()) as { artisan_id: string };
