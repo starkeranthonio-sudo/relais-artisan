@@ -36,6 +36,7 @@ export interface NewTester {
   trade: string | null;
   postalCode: string | null;
   referredBy: string | null;
+  prospectCode: string | null;
   token: string;
 }
 
@@ -100,6 +101,7 @@ export interface RegisterInput {
   trade?: unknown;
   postalCode?: unknown;
   ref?: unknown;
+  prospect?: unknown; // code du lien de prospection (/testeurs?p=…)
   sessionId?: unknown;
 }
 
@@ -124,13 +126,15 @@ export async function register(input: RegisterInput, deps: ProgramDeps): Promise
 
   const ref = clean(input.ref, 32).toLowerCase();
   const referredBy = ref ? await deps.store.findIdByReferralCode(ref) : null;
+  const prospect = clean(input.prospect, 10).toLowerCase();
+  const prospectCode = /^[a-z0-9]{6,10}$/.test(prospect) ? prospect : null;
   const token = (deps.newToken ?? (() => randomToken(16)))();
   const tester = await deps.store.createTester({
-    businessName, firstName, lastName, phone, token, referredBy,
+    businessName, firstName, lastName, phone, token, referredBy, prospectCode,
     trade: clean(input.trade, 60) || null,
     postalCode: postalCode || null,
   });
-  await deps.store.logFunnel(tester.id, "info_submitted", sessionOf(input.sessionId), { ref: ref || null });
+  await deps.store.logFunnel(tester.id, "info_submitted", sessionOf(input.sessionId), { ref: ref || null, prospect: prospectCode });
   // Pas de SMS RelaisArti ici : le premier SMS reçu est celui de l'essai ; le remerciement arrive à la fin.
   return { ok: true, value: { token } };
 }

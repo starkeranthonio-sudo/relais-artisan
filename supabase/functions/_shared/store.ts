@@ -441,6 +441,7 @@ export function supabaseProgramStore(client: SupabaseClient): ProgramStore {
       const row = check(
         await client.from("testers").insert({
           artisan_id: artisan.id, token: t.token, first_name: t.firstName, last_name: t.lastName, referred_by: t.referredBy,
+          prospect_code: t.prospectCode,
         }).select(TESTER_SELECT).single(),
       );
       return one(row)!;

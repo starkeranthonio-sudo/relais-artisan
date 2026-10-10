@@ -51,14 +51,15 @@ export function TesterLanding() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const ref = params.get("parrain");
+  const prospect = params.get("p");
   const [step, setStep] = useState<"intro" | "info">("intro");
 
   useEffect(() => {
     document.title = "Testeurs fondateurs – RelaisArti";
-    logStep("landing_view", ref, { source: ref ? "parrainage" : "direct" });
+    logStep("landing_view", ref, { source: ref ? "parrainage" : prospect ? "prospection" : "direct", ...(prospect && { prospect: prospect.slice(0, 10).toLowerCase() }) });
     const token = savedToken.get();
     if (token) navigate(`/testeurs/moi/${token}`, { replace: true });
-  }, [ref, navigate]);
+  }, [ref, prospect, navigate]);
 
   return (
     <main className="founders">
@@ -81,14 +82,14 @@ export function TesterLanding() {
           <Conditions />
         </>
       ) : (
-        <InfoStep referral={ref} onBack={() => setStep("intro")} />
+        <InfoStep referral={ref} prospect={prospect} onBack={() => setStep("intro")} />
       )}
       <ContactLine />
     </main>
   );
 }
 
-function InfoStep({ referral, onBack }: { referral: string | null; onBack: () => void }) {
+function InfoStep({ referral, prospect, onBack }: { referral: string | null; prospect: string | null; onBack: () => void }) {
   const navigate = useNavigate();
   const [f, setF] = useState({ businessName: "", firstName: "", lastName: "", phone: "", trade: "", postalCode: "" });
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +106,7 @@ function InfoStep({ referral, onBack }: { referral: string | null; onBack: () =>
     setBusy(true);
     setError(null);
     try {
-      const r = await testerApi.register({ ...f, ref: referral ?? "" });
+      const r = await testerApi.register({ ...f, ref: referral ?? "", prospect: prospect ?? "" });
       if (r.token) {
         savedToken.set(r.token);
         navigate(`/testeurs/moi/${r.token}`);

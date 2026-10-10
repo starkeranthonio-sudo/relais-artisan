@@ -9,6 +9,7 @@ import { isGsm7, toGsm7 } from "../_shared/twilio.ts";
 function setup() {
   const testers: Tester[] = [];
   const referredBy = new Map<string, string | null>();
+  const prospects = new Map<string, string | null>();
   const funnel: { tester: string; step: string; session: string | null }[] = [];
   const sent: { to: string; body: string }[] = [];
   const proofs: string[] = [];
@@ -22,6 +23,7 @@ function setup() {
     findIdByReferralCode: (c) => Promise.resolve(testers.find((t) => t.referral_code === c)?.id ?? null),
     createTester: (nt) => {
       n++;
+      prospects.set(`t${n}`, nt.prospectCode);
       const t: Tester = {
         id: `t${n}`, token: nt.token, referral_code: `code${n}`, first_name: nt.firstName, last_name: nt.lastName,
         siret_status: "none", completed_at: null, survey: {}, survey_completed_at: null, referred_by: nt.referredBy,
@@ -73,7 +75,7 @@ function setup() {
     appUrl: "https://relaisarti.fr",
     newToken: () => `tok${++tok}`,
   };
-  return { deps, testers, funnel, sent, proofs, referredBy, completedTests };
+  return { deps, testers, funnel, sent, proofs, referredBy, prospects, completedTests };
 }
 
 const INFO = { businessName: "Dupont Plomberie", firstName: "Jean", lastName: "Dupont", phone: "06 12 34 56 78", trade: "Plombier", postalCode: "78140", sessionId: "session-123" };
@@ -254,4 +256,12 @@ Deno.test("SMS au parrain : 1 SMS GSM-7 dans tous les cas", () => {
     assert(isGsm7(g), g);
     assert(g.length <= 160, `${n} : ${g.length} ${g}`);
   }
+});
+
+Deno.test("prospection : le code du lien est rattaché au testeur, un code invalide est ignoré", async () => {
+  const { deps, prospects } = setup();
+  await register({ ...INFO, prospect: "Ab3kx9q" }, deps);
+  await register({ ...INFO, phone: "0611111111", prospect: "<script>" }, deps);
+  assertEquals(prospects.get("t1"), "ab3kx9q");
+  assertEquals(prospects.get("t2"), null);
 });

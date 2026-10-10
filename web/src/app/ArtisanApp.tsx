@@ -8,6 +8,7 @@ import { AppProvider, useApp } from "./context.tsx";
 import { demoApi } from "./demoApi.ts";
 import { LeadDetailPage } from "./LeadDetailPage.tsx";
 import { LeadsPage } from "./LeadsPage.tsx";
+import { ProspectionPage } from "./ProspectionPage.tsx";
 import { QuotesPage } from "./QuotesPage.tsx";
 import { SetupPage } from "./SetupPage.tsx";
 import { StatsPage } from "./StatsPage.tsx";
@@ -34,6 +35,7 @@ export function ArtisanApp({ demo }: { demo: boolean }) {
           <Route path="devis" element={<QuotesPage />} />
           <Route path="bilan" element={<StatsPage />} />
           <Route path="installation" element={<SetupPage />} />
+          {!demo && <Route path="prospection" element={<ProspectionPage />} />}
         </Route>
         <Route path="*" element={<Navigate to={base} replace />} />
       </Routes>
