@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase.ts";
+import { toE164 } from "./format.ts";
 
 // Prospection du fondateur : liste saisie à la main, messages envoyés un par un depuis son téléphone.
 
@@ -89,6 +90,32 @@ export function saveTemplates(t: Templates) {
   } catch { /* ignoré */ }
 }
 
+export type NewProspect = Pick<Prospect, "business_name" | "first_name" | "trade" | "city" | "phone" | "source">;
+
+/**
+ * Liste collée ou fichier CSV : une ligne par artisan, « ; » ou tabulation entre les colonnes,
+ * dans l'ordre entreprise ; téléphone ; métier ; ville ; prénom ; source. Ligne d'en-tête ignorée.
+ */
+export function parseProspectList(text: string): { rows: NewProspect[]; rejected: string[] } {
+  const rows: NewProspect[] = [];
+  const rejected: string[] = [];
+  const sources = SOURCES.map((x) => x.value as string);
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim() || /^entreprise[;\t]/i.test(line)) continue;
+    const [name = "", rawPhone = "", trade = "", city = "", first = "", source = ""] = line.split(/[;\t]/).map((c) => c.trim());
+    const phone = toE164(rawPhone);
+    if (!name || !phone) {
+      rejected.push(line);
+      continue;
+    }
+    rows.push({
+      business_name: name.slice(0, 100), phone, trade: trade.slice(0, 60) || null, city: city.slice(0, 60) || null,
+      first_name: first.slice(0, 50) || null, source: (sources.includes(source) ? source : "autre") as ProspectSource,
+    });
+  }
+  return { rows, rejected };
+}
+
 function check<T>(r: { data: T | null; error: { message: string; code?: string } | null }): T {
   if (r.error) throw Object.assign(new Error(r.error.message), { code: r.error.code });
   return r.data as T;
@@ -104,7 +131,11 @@ export const prospectApi = {
     const rows = check(await supabase.rpc("my_prospect_progress")) as ({ code: string } & Progress)[];
     return new Map(rows.map((r) => [r.code, r]));
   },
-  async add(p: Pick<Prospect, "business_name" | "first_name" | "trade" | "city" | "phone" | "source">): Promise<Prospect> {
+  /** Ajout en lot ; les numéros déjà dans la liste sont ignorés. Renvoie les fiches réellement ajoutées. */
+  async addMany(rows: NewProspect[]): Promise<Prospect[]> {
+    return check(await supabase.from("prospects").upsert(rows, { onConflict: "owner_id,phone", ignoreDuplicates: true }).select(COLUMNS));
+  },
+  async add(p: NewProspect): Promise<Prospect> {
     return check(await supabase.from("prospects").insert(p).select(COLUMNS).single());
   },
   async markContacted(p: Prospect, channel: Channel): Promise<Prospect> {

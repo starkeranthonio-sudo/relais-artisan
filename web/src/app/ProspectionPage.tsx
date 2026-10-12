@@ -3,7 +3,7 @@ import { formatPhone, relativeTime, toE164 } from "./format.ts";
 import { TRADES } from "./founders.ts";
 import {
   buildMessage, type Channel, DAILY_LIMIT, DEFAULT_TEMPLATES, FOLLOW_UP_AFTER_DAYS, isMobile, loadTemplates, needsFollowUp, type Progress, type Prospect,
-  prospectApi, type ProspectSource, type ProspectStatus, saveTemplates, smsHref, SOURCES, type Templates, whatsappHref,
+  parseProspectList, prospectApi, type ProspectSource, type ProspectStatus, saveTemplates, smsHref, SOURCES, type Templates, whatsappHref,
 } from "./prospection.ts";
 
 type Filter = "todo" | "followup" | "ongoing" | "all";
@@ -68,6 +68,7 @@ export function ProspectionPage() {
       </div>
 
       <AddProspect onAdded={(p) => (setProspects((list) => [p, ...(list ?? [])]), setFilter("todo"))} />
+      <ImportProspects onImported={(added) => (setProspects((list) => [...added, ...(list ?? [])]), setFilter("todo"))} />
 
       <div className="tabs-inline" role="tablist">
         {([["todo", "À contacter"], ["followup", "À relancer"], ["ongoing", "En cours"], ["all", "Tous"]] as const).map(([f, label]) => (
@@ -288,6 +289,49 @@ function TemplateEditor({ templates, onSave }: { templates: Templates; onSave: (
       <div className="actions-2">
         <button className="btn-secondary" onClick={() => setT(DEFAULT_TEMPLATES)}>Messages d'origine</button>
         <button className="btn-primary" onClick={() => onSave(t)}>Enregistrer</button>
+      </div>
+    </div>
+  );
+}
+
+/** Import d'une liste préparée (fichier CSV ou texte collé). */
+function ImportProspects({ onImported }: { onImported: (added: Prospect[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const parsed = useMemo(() => parseProspectList(text), [text]);
+
+  async function readFile(file: File | undefined) {
+    if (file) setText(await file.text());
+  }
+  async function submit() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const added = await prospectApi.addMany(parsed.rows);
+      onImported(added);
+      const skipped = parsed.rows.length - added.length;
+      setResult(`${added.length} artisan${added.length > 1 ? "s" : ""} ajouté${added.length > 1 ? "s" : ""}${skipped ? `, ${skipped} déjà dans la liste` : ""}.`);
+      setText("");
+    } catch {
+      setResult("Import impossible. Vérifiez votre connexion.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) return <button className="btn-ghost" onClick={() => setOpen(true)}>Importer une liste</button>;
+  return (
+    <div className="panel stack">
+      <p className="small muted">Un artisan par ligne : entreprise ; téléphone ; métier ; ville ; prénom ; source. Fichier CSV ou texte collé.</p>
+      <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(e) => void readFile(e.target.files?.[0])} />
+      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder="Durand Plomberie;06 12 34 56 78;Plombier;Versailles;Marc;google_maps" />
+      {text && <p className="small">{parsed.rows.length} artisan{parsed.rows.length > 1 ? "s" : ""} prêt{parsed.rows.length > 1 ? "s" : ""}{parsed.rejected.length > 0 && <span className="muted"> · {parsed.rejected.length} ligne{parsed.rejected.length > 1 ? "s" : ""} ignorée{parsed.rejected.length > 1 ? "s" : ""} (numéro invalide)</span>}</p>}
+      {result && <p className="success small">{result}</p>}
+      <div className="actions-2">
+        <button className="btn-secondary" onClick={() => setOpen(false)}>Fermer</button>
+        <button className="btn-primary" disabled={busy || parsed.rows.length === 0} onClick={submit}>{busy ? "Import…" : "Importer"}</button>
       </div>
     </div>
   );
