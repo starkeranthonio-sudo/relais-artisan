@@ -43,7 +43,7 @@ export const FOLLOW_UP_AFTER_DAYS = 3;
 
 export const DEFAULT_TEMPLATES = {
   first:
-    "{debut}, chaque appel manqué, c'est un client perdu{perte}. {solution} Ça vous dérangerait de le tester ? 2 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir",
+    "{debut}, chaque appel manqué, c'est un client perdu.{perte} {solution} Ça vous dérangerait de le tester ? 2 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir",
   followUp:
     "{bonjour}, je me permets de revenir vers vous : chaque appel manqué, c'est un client perdu. RelaisArti gère vos appels manqués à votre place. Ça vous dérangerait de le tester ? 2 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir",
 };
@@ -51,14 +51,19 @@ export type Templates = typeof DEFAULT_TEMPLATES;
 
 export const prospectLink = (code: string) => `${window.location.origin}/testeurs?p=${code}`;
 
-// Ce que coûte un appel manqué, selon le métier : montants prudents (bas des fourchettes de prix 2026).
-// Dépannage plomberie / électricité / chauffage : 150 à 450 € l'intervention ; peinture ≈ 30 €/m² ; carrelage 60 à 190 €/m².
+// Ce que coûtent 5 appels manqués par mois, selon le métier : montants prudents (bas des fourchettes de prix 2026).
+// Dépannage (plomberie, électricité, chauffage : 150 à 450 € l'intervention) : 5 × 200 € = 1 000 €/mois.
+// Métiers à devis : 5 appels manqués ≈ au moins 1 chantier perdu (peinture ≈ 1 200 € la pièce, carrelage ≈ 1 500 € la salle de bain).
 const REPAIR_TRADES = ["Plombier", "Chauffagiste", "Électricien", "Serrurier", "Climaticien", "Multiservice"];
-const QUOTE_LOSS: Record<string, string> = { Peintre: "souvent un chantier à plus de 1 000 €", Carreleur: "souvent une salle de bain à plus de 1 500 €" };
+const QUOTE_JOB: Record<string, number> = { Peintre: 1200, Carreleur: 1500 };
+const euros = (n: number) => `${n.toLocaleString("fr-FR").replace(/\s/g, " ")} €`;
 
 function lossFor(trade: string | null): string {
-  if (trade && REPAIR_TRADES.includes(trade)) return " : environ 200 € qui partent chez un confrère";
-  if (trade && QUOTE_LOSS[trade]) return `, ${QUOTE_LOSS[trade]}`;
+  if (trade && REPAIR_TRADES.includes(trade)) {
+    return ` 5 appels manqués par mois, c'est environ ${euros(1000)} de dépannages qui partent chez un concurrent : ${euros(12000)} par an.`;
+  }
+  const job = trade ? QUOTE_JOB[trade] : undefined;
+  if (job) return ` 5 appels manqués par mois, c'est au moins un chantier, environ ${euros(job)} qui partent chez un concurrent : ${euros(job * 12)} par an.`;
   return ""; // couvreur, menuisier, maçon… : pas de chiffre fiable, on n'en invente pas
 }
 
@@ -72,8 +77,7 @@ export function greeting(p: Pick<Prospect, "first_name" | "business_name">): str
 export function buildMessage(template: string, p: Prospect): string {
   const source = SOURCES.find((s) => s.value === p.source)?.inText ?? "internet";
   const hello = greeting(p);
-  // Avis Google cités seulement à partir de 10 : en dessous, le détail ne valorise pas l'artisan.
-  const opening = (p.google_reviews ?? 0) >= 10 ? `${hello}, ${p.google_reviews} avis Google, bravo. Mais sur un chantier` : `${hello}, sur un chantier`;
+  const opening = `${hello}, sur un chantier`;
   const repair = !p.trade || REPAIR_TRADES.includes(p.trade);
   return template
     .replaceAll("{debut}", opening)
@@ -104,7 +108,7 @@ export function needsFollowUp(p: Prospect, progress: Progress | undefined, now =
     p.last_contacted_at !== null && now - new Date(p.last_contacted_at).getTime() >= FOLLOW_UP_AFTER_DAYS * 86_400_000;
 }
 
-const TEMPLATES_KEY = "ra_prospection_templates_v3";
+const TEMPLATES_KEY = "ra_prospection_templates_v4";
 export function loadTemplates(): Templates {
   try {
     const saved = JSON.parse(localStorage.getItem(TEMPLATES_KEY) ?? "null");
