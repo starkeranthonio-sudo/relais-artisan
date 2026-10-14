@@ -21,6 +21,7 @@ export interface Prospect {
   last_contacted_at: string | null;
   last_channel: Channel | null;
   created_at: string;
+  google_reviews: number | null;
 }
 
 export interface Progress {
@@ -42,18 +43,45 @@ export const FOLLOW_UP_AFTER_DAYS = 3;
 
 export const DEFAULT_TEMPLATES = {
   first:
-    "{bonjour}, je m'appelle Starker. J'ai trouvé {entreprise} sur {source}. Je lance RelaisArti : quand vous ratez un appel sur un chantier, votre client reçoit tout de suite un SMS à votre nom. Je cherche quelques artisans pour le tester, ça prend 3 min : {lien}\nRépondez STOP pour ne plus être contacté.",
+    "{debut}, chaque appel manqué, c'est un client perdu{perte}. {solution} Ça vous dérangerait d'essayer ? 2 min, c'est vous qui voyez : {lien}\nSTOP pour ne plus recevoir",
   followUp:
-    "{bonjour}, c'est Starker de RelaisArti. Je me permets de vous relancer : je cherche encore quelques artisans pour tester l'outil, ça prend 3 min : {lien}\nRépondez STOP pour ne plus être contacté.",
+    "{bonjour}, je me permets de revenir vers vous : chaque appel manqué, c'est un client perdu. RelaisArti gère vos appels manqués à votre place. Ça vous dérangerait d'essayer ? 2 min : {lien}\nSTOP pour ne plus recevoir",
 };
 export type Templates = typeof DEFAULT_TEMPLATES;
 
 export const prospectLink = (code: string) => `${window.location.origin}/testeurs?p=${code}`;
 
+// Ce que coûtent 5 appels manqués par mois, selon le métier (montants prudents, bas des fourchettes de prix 2026).
+// Dépannage ≈ 200 € l'intervention ; peinture ≈ 1 200 € la pièce ; carrelage ≈ 1 500 € la salle de bain.
+const REPAIR_TRADES = ["Plombier", "Chauffagiste", "Électricien", "Serrurier", "Climaticien", "Multiservice"];
+const QUOTE_LOSS: Record<string, string> = { Peintre: "6 000 €", Carreleur: "7 500 €" };
+
+function lossFor(trade: string | null): string {
+  if (trade && REPAIR_TRADES.includes(trade)) return " : 5 par mois, c'est jusqu'à 1 000 € qui partent chez un confrère";
+  if (trade && QUOTE_LOSS[trade]) return ` : 5 par mois, c'est jusqu'à ${QUOTE_LOSS[trade]} de travaux qui partent chez un concurrent`;
+  return ""; // couvreur, menuisier, maçon… : pas de chiffre fiable, on n'en invente pas
+}
+
+/** « Bonjour Micael » ou, sans prénom connu, « Bonjour l'équipe de Durand Plomberie » (« d'… » devant une voyelle). */
+export function greeting(p: Pick<Prospect, "first_name" | "business_name">): string {
+  if (p.first_name) return `Bonjour ${p.first_name}`;
+  const name = p.business_name.trim();
+  return `Bonjour l'équipe ${/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? "d'" : "de "}${name}`;
+}
+
 export function buildMessage(template: string, p: Prospect): string {
   const source = SOURCES.find((s) => s.value === p.source)?.inText ?? "internet";
+  const hello = greeting(p);
+  // Avis Google cités seulement à partir de 10 : en dessous, le détail ne valorise pas l'artisan.
+  const opening = (p.google_reviews ?? 0) >= 10 ? `${hello}, ${p.google_reviews} avis Google, bravo. Mais sur un chantier` : `${hello}, sur un chantier`;
+  const repair = !p.trade || REPAIR_TRADES.includes(p.trade);
   return template
-    .replaceAll("{bonjour}", p.first_name ? `Bonjour ${p.first_name}` : "Bonjour")
+    .replaceAll("{debut}", opening)
+    .replaceAll("{bonjour}", hello)
+    .replaceAll("{perte}", lossFor(p.trade))
+    .replaceAll("{solution}", repair
+      ? "RelaisArti gère vos appels manqués : vous récupérez la demande et le chantier."
+      : "RelaisArti gère vos appels manqués et relance vos devis.")
     .replaceAll("{entreprise}", p.business_name)
     .replaceAll("{source}", source)
     .replaceAll("{ville}", p.city ?? "")
@@ -76,7 +104,7 @@ export function needsFollowUp(p: Prospect, progress: Progress | undefined, now =
     p.last_contacted_at !== null && now - new Date(p.last_contacted_at).getTime() >= FOLLOW_UP_AFTER_DAYS * 86_400_000;
 }
 
-const TEMPLATES_KEY = "ra_prospection_templates";
+const TEMPLATES_KEY = "ra_prospection_templates_v2";
 export function loadTemplates(): Templates {
   try {
     const saved = JSON.parse(localStorage.getItem(TEMPLATES_KEY) ?? "null");
@@ -121,7 +149,7 @@ function check<T>(r: { data: T | null; error: { message: string; code?: string }
   return r.data as T;
 }
 
-const COLUMNS = "id, code, business_name, first_name, trade, city, phone, source, status, contact_count, last_contacted_at, last_channel, created_at";
+const COLUMNS = "id, code, business_name, first_name, trade, city, phone, source, status, contact_count, last_contacted_at, last_channel, created_at, google_reviews";
 
 export const prospectApi = {
   async list(): Promise<Prospect[]> {
