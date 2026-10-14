@@ -56,9 +56,15 @@ export function TesterLanding() {
 
   useEffect(() => {
     document.title = "Testeurs fondateurs – RelaisArti";
-    logStep("landing_view", ref, { source: ref ? "parrainage" : prospect ? "prospection" : "direct", ...(prospect && { prospect: prospect.slice(0, 10).toLowerCase() }) });
+    // Compté après 2 s de page visible : un aperçu de lien (chargé en arrière-plan puis fermé) n'est pas une visite.
+    const timer = setTimeout(() => {
+      if (document.visibilityState === "visible") {
+        logStep("landing_view", ref, { source: ref ? "parrainage" : prospect ? "prospection" : "direct", ...(prospect && { prospect: prospect.slice(0, 10).toLowerCase() }) });
+      }
+    }, 2000);
     const token = savedToken.get();
     if (token) navigate(`/testeurs/moi/${token}`, { replace: true });
+    return () => clearTimeout(timer);
   }, [ref, prospect, navigate]);
 
   return (

@@ -49,6 +49,8 @@ export function sessionId(): string {
 /** Étapes « visiteur » (avant inscription) : page ouverte, présentation lue, lien partagé. */
 export function logStep(step: "landing_view" | "intro_next" | "share_clicked", ref: string | null, props: Record<string, unknown> = {}) {
   if (ref === "demo123" || location.pathname.endsWith("/demo")) return; // parcours de démonstration : rien n'est compté
+  // Aperçus de lien (iMessage, WhatsApp, Facebook…) : le téléphone de l'expéditeur charge la page pour en faire la vignette.
+  if (/facebookexternalhit|Facebot|Twitterbot|WhatsApp|TelegramBot|Slackbot|Discordbot|bot\b|crawler|spider/i.test(navigator.userAgent)) return;
   void supabase.from("funnel_events").insert({ session_id: sessionId(), ref: ref?.slice(0, 32) || null, step, props }).then(({ error }) => {
     if (error) console.warn("Étape non enregistrée", step, error.message);
   });
