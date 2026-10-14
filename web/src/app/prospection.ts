@@ -84,7 +84,7 @@ export function buildMessage(template: string, p: Prospect): string {
     .replaceAll("{bonjour}", hello)
     .replaceAll("{perte}", lossFor(p.trade))
     .replaceAll("{solution}", repair
-      ? "RelaisArti gère vos appels manqués : le client est pris en charge à votre nom et vous récupérez le chantier."
+      ? "RelaisArti gère vos appels manqués : le client est pris en charge à votre nom et vous ne perdez pas le contrat."
       : "RelaisArti gère vos appels manqués et relance vos devis : vous ne laissez plus filer de travaux.")
     .replaceAll("{entreprise}", p.business_name)
     .replaceAll("{source}", source)
@@ -108,7 +108,7 @@ export function needsFollowUp(p: Prospect, progress: Progress | undefined, now =
     p.last_contacted_at !== null && now - new Date(p.last_contacted_at).getTime() >= FOLLOW_UP_AFTER_DAYS * 86_400_000;
 }
 
-const TEMPLATES_KEY = "ra_prospection_templates_v5";
+const TEMPLATES_KEY = "ra_prospection_templates_v6";
 export function loadTemplates(): Templates {
   try {
     const saved = JSON.parse(localStorage.getItem(TEMPLATES_KEY) ?? "null");
