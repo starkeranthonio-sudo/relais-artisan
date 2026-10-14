@@ -43,9 +43,9 @@ export const FOLLOW_UP_AFTER_DAYS = 3;
 
 export const DEFAULT_TEMPLATES = {
   first:
-    "{debut}, chaque appel manqué, c'est un client perdu.{perte} {solution} Ça vous dérangerait de le tester ? 2 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir",
+    "{debut}, chaque appel manqué, c'est un client perdu.{perte} {solution} Ça vous dérangerait de le tester ? 1 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir",
   followUp:
-    "{bonjour}, je me permets de revenir vers vous : chaque appel manqué, c'est un client perdu. RelaisArti gère vos appels manqués à votre place. Ça vous dérangerait de le tester ? 2 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir",
+    "{bonjour}, je me permets de revenir vers vous : chaque appel manqué, c'est un client perdu. RelaisArti gère vos appels manqués à votre place. Ça vous dérangerait de le tester ? 1 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir",
 };
 export type Templates = typeof DEFAULT_TEMPLATES;
 
@@ -77,7 +77,7 @@ export function greeting(p: Pick<Prospect, "first_name" | "business_name">): str
 export function buildMessage(template: string, p: Prospect): string {
   const source = SOURCES.find((s) => s.value === p.source)?.inText ?? "internet";
   const hello = greeting(p);
-  const opening = `${hello}, sur un chantier`;
+  const opening = hello;
   const repair = !p.trade || REPAIR_TRADES.includes(p.trade);
   return template
     .replaceAll("{debut}", opening)
@@ -108,7 +108,7 @@ export function needsFollowUp(p: Prospect, progress: Progress | undefined, now =
     p.last_contacted_at !== null && now - new Date(p.last_contacted_at).getTime() >= FOLLOW_UP_AFTER_DAYS * 86_400_000;
 }
 
-const TEMPLATES_KEY = "ra_prospection_templates_v4";
+const TEMPLATES_KEY = "ra_prospection_templates_v5";
 export function loadTemplates(): Templates {
   try {
     const saved = JSON.parse(localStorage.getItem(TEMPLATES_KEY) ?? "null");

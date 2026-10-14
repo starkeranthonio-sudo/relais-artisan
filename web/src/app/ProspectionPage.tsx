@@ -273,7 +273,7 @@ function TemplateEditor({ templates, onSave }: { templates: Templates; onSave: (
   return (
     <div className="panel stack">
       <p className="small muted">
-        Remplacés automatiquement : {"{debut}"} (« Bonjour Marc, sur un chantier »), {"{bonjour}"} (« Bonjour Marc » ou « Bonjour l'équipe de… »), {"{perte}"} (montant perdu selon le métier), {"{solution}"}, {"{entreprise}"}, {"{ville}"}, {"{metier}"}, {"{lien}"}.
+        Remplacés automatiquement : {"{debut}"} (« Bonjour Marc » ou « Bonjour l'équipe de… »), {"{bonjour}"} (« Bonjour Marc » ou « Bonjour l'équipe de… »), {"{perte}"} (montant perdu selon le métier), {"{solution}"}, {"{entreprise}"}, {"{ville}"}, {"{metier}"}, {"{lien}"}.
         Gardez toujours {"{lien}"} (suivi) et la mention STOP (obligatoire).
       </p>
       <label className="field">
