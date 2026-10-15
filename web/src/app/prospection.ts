@@ -41,12 +41,10 @@ export const SOURCES: { value: ProspectSource; label: string; inText: string }[]
 export const DAILY_LIMIT = 50;
 export const FOLLOW_UP_AFTER_DAYS = 3;
 
-export const DEFAULT_TEMPLATES = {
-  first:
-    "{debut}, chaque appel manqué, c'est un client perdu.{perte} {solution} Ça vous dérangerait de le tester ? 1 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir",
-  followUp:
-    "{bonjour}, je me permets de revenir vers vous : chaque appel manqué, c'est un client perdu. RelaisArti gère vos appels manqués à votre place. Ça vous dérangerait de le tester ? 1 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir",
-};
+// Le message validé, identique pour le premier envoi et la relance.
+const MESSAGE =
+  "{debut}, chaque appel manqué, c'est un client perdu.{perte} {solution} Ça vous dérangerait de le tester ? 1 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir";
+export const DEFAULT_TEMPLATES = { first: MESSAGE, followUp: MESSAGE };
 export type Templates = typeof DEFAULT_TEMPLATES;
 
 export const prospectLink = (code: string) => `${window.location.origin}/testeurs?p=${code}`;
@@ -108,18 +106,12 @@ export function needsFollowUp(p: Prospect, progress: Progress | undefined, now =
     p.last_contacted_at !== null && now - new Date(p.last_contacted_at).getTime() >= FOLLOW_UP_AFTER_DAYS * 86_400_000;
 }
 
-const TEMPLATES_KEY = "ra_prospection_templates_v6";
+/** Toujours le message validé (les anciens modèles gardés dans le téléphone sont ignorés). */
 export function loadTemplates(): Templates {
   try {
-    const saved = JSON.parse(localStorage.getItem(TEMPLATES_KEY) ?? "null");
-    if (saved && typeof saved.first === "string" && typeof saved.followUp === "string") return saved;
-  } catch { /* stockage indisponible : modèles par défaut */ }
+    for (const k of Object.keys(localStorage)) if (k.startsWith("ra_prospection_templates")) localStorage.removeItem(k);
+  } catch { /* stockage indisponible */ }
   return DEFAULT_TEMPLATES;
-}
-export function saveTemplates(t: Templates) {
-  try {
-    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
-  } catch { /* ignoré */ }
 }
 
 export type NewProspect = Pick<Prospect, "business_name" | "first_name" | "trade" | "city" | "phone" | "source">;

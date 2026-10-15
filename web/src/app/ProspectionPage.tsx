@@ -2,8 +2,8 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { formatPhone, relativeTime, toE164 } from "./format.ts";
 import { TRADES } from "./founders.ts";
 import {
-  buildMessage, type Channel, DAILY_LIMIT, DEFAULT_TEMPLATES, FOLLOW_UP_AFTER_DAYS, isMobile, loadTemplates, needsFollowUp, type Progress, type Prospect,
-  parseProspectList, prospectApi, type ProspectSource, type ProspectStatus, saveTemplates, smsHref, SOURCES, type Templates, whatsappHref,
+  buildMessage, type Channel, DAILY_LIMIT, FOLLOW_UP_AFTER_DAYS, isMobile, loadTemplates, needsFollowUp, type Progress, type Prospect,
+  parseProspectList, prospectApi, type ProspectSource, type ProspectStatus, smsHref, SOURCES, type Templates, whatsappHref,
 } from "./prospection.ts";
 
 type Filter = "todo" | "followup" | "ongoing" | "all";
@@ -18,8 +18,7 @@ export function ProspectionPage() {
   const [progress, setProgress] = useState<Map<string, Progress>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("todo");
-  const [templates, setTemplates] = useState<Templates>(loadTemplates);
-  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates] = useState<Templates>(loadTemplates);
 
   useEffect(() => {
     document.title = "Prospection – RelaisArti";
@@ -93,9 +92,6 @@ export function ProspectionPage() {
             onRemove={() => setProspects((list) => list?.filter((x) => x.id !== p.id) ?? null)} />
         ))}
       </ul>
-
-      <button className="btn-ghost" onClick={() => setShowTemplates((v) => !v)}>{showTemplates ? "Fermer les messages" : "Modifier les messages"}</button>
-      {showTemplates && <TemplateEditor templates={templates} onSave={(t) => (setTemplates(t), saveTemplates(t), setShowTemplates(false))} />}
     </section>
   );
 }
@@ -268,32 +264,6 @@ function ProspectRow({ p, progress, templates, onChange, onRemove }: {
       </div>
       {error && <p className="error small">{error}</p>}
     </li>
-  );
-}
-
-function TemplateEditor({ templates, onSave }: { templates: Templates; onSave: (t: Templates) => void }) {
-  const [t, setT] = useState(templates);
-  return (
-    <div className="panel stack">
-      <p className="small muted">
-        Remplacés automatiquement : {"{debut}"} (« Bonjour Marc » ou « Bonjour l'équipe de… »), {"{bonjour}"} (« Bonjour Marc » ou « Bonjour l'équipe de… »), {"{perte}"} (montant perdu selon le métier), {"{solution}"}, {"{entreprise}"}, {"{ville}"}, {"{metier}"}, {"{lien}"}.
-        Gardez toujours {"{lien}"} (suivi) et la mention STOP (obligatoire).
-      </p>
-      <label className="field">
-        <span className="label">Premier message</span>
-        <textarea value={t.first} onChange={(e) => setT({ ...t, first: e.target.value })} rows={6} />
-      </label>
-      <label className="field">
-        <span className="label">Relance (3 jours après)</span>
-        <textarea value={t.followUp} onChange={(e) => setT({ ...t, followUp: e.target.value })} rows={5} />
-      </label>
-      {(!t.first.includes("{lien}") || !t.followUp.includes("{lien}")) && <p className="error small">Il manque {"{lien}"} dans un message : vous ne pourrez pas suivre qui clique.</p>}
-      {(!/STOP/.test(t.first) || !/STOP/.test(t.followUp)) && <p className="error small">Il manque la mention STOP dans un message : elle est obligatoire.</p>}
-      <div className="actions-2">
-        <button className="btn-secondary" onClick={() => setT(DEFAULT_TEMPLATES)}>Messages d'origine</button>
-        <button className="btn-primary" onClick={() => onSave(t)}>Enregistrer</button>
-      </div>
-    </div>
   );
 }
 
