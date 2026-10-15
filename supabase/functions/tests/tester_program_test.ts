@@ -89,29 +89,14 @@ Deno.test("inscription : testeur créé, aucun SMS RelaisArti (le 1er SMS sera l
   assertEquals(funnel[0], { tester: "t1", step: "info_submitted", session: "session-123" });
 });
 
-Deno.test("fin du parcours : remerciement avec lien de parrainage si SIRET, sans lien sinon ; une seule fois", async () => {
-  const withSiret = setup();
-  await register(INFO, withSiret.deps);
-  await checkSiret("tok1", "92759307900050", null, withSiret.deps);
-  await complete("tok1", null, withSiret.deps);
-  await complete("tok1", null, withSiret.deps);
-  assertEquals(withSiret.sent.length, 1);
-  assertStringIncludes(withSiret.sent[0].body, "Merci Jean, vous voilà testeur fondateur");
-  assertStringIncludes(withSiret.sent[0].body, "https://relaisarti.fr/testeurs?parrain=code1");
-
-  const without = setup();
-  await register(INFO, without.deps);
-  await skipSiret("tok1", null, without.deps);
-  await complete("tok1", null, without.deps);
-  assertEquals(without.sent.length, 1);
-  assertStringIncludes(without.sent[0].body, "vous voilà inscrit comme testeur");
-  assert(!without.sent[0].body.includes("parrain"), "pas de lien sans SIRET");
-
-  // SIRET ajouté après coup : le lien arrive par SMS.
-  await checkSiret("tok1", "92759307900050", null, without.deps);
-  assertEquals(without.sent.length, 2);
-  assertStringIncludes(without.sent[1].body, "votre SIRET est enregistré");
-  assertStringIncludes(without.sent[1].body, "parrain=code1");
+Deno.test("fin du parcours : remerciement avec le lien de parrainage (sans SIRET) ; une seule fois", async () => {
+  const { deps, sent } = setup();
+  await register(INFO, deps);
+  await complete("tok1", null, deps);
+  await complete("tok1", null, deps);
+  assertEquals(sent.length, 1);
+  assertStringIncludes(sent[0].body, "Merci Jean, vous voilà testeur fondateur");
+  assertStringIncludes(sent[0].body, "https://relaisarti.fr/testeurs?parrain=code1");
 });
 
 Deno.test("inscription : validations, et numéro déjà inscrit → lien renvoyé par SMS sans être affiché", async () => {
@@ -140,14 +125,14 @@ Deno.test("parrainage : le code du lien rattache le filleul ; seuls ceux allés 
   assertEquals(s.value.referrals, { registered: 2, counted: 1 });
 });
 
-Deno.test("lien de parrainage seulement avec un SIRET vérifié ou une photo de devis envoyée", async () => {
-  const { deps } = setup();
+Deno.test("lien de parrainage affiché dès les questions terminées, sans SIRET", async () => {
+  const { deps, testers } = setup();
   await register(INFO, deps);
   const before = await getState("tok1", deps);
   assert(before.ok && before.value.referralCode === null);
-  assert((await checkSiret("tok1", "927 593 079 00050", "session-123", deps)).ok);
+  testers[0].survey_completed_at = new Date().toISOString();
   const after = await getState("tok1", deps);
-  assert(after.ok && after.value.referralCode === "code1" && after.value.siretStatus === "verified");
+  assert(after.ok && after.value.referralCode === "code1");
 });
 
 Deno.test("SIRET introuvable → code « not_found » ; photo de devis → vérification manuelle et lien de parrainage", async () => {
@@ -159,7 +144,7 @@ Deno.test("SIRET introuvable → code « not_found » ; photo de devis → véri
   assert((await sendProof("tok1", { bytes: new Uint8Array(10), type: "image/jpeg" }, "552 032 534 00646", null, deps)).ok);
   assertEquals(proofs.length, 1);
   const s = await getState("tok1", deps);
-  assert(s.ok && s.value.siretStatus === "pending_manual" && s.value.referralCode === "code1");
+  assert(s.ok && s.value.siretStatus === "pending_manual");
   assert(funnel.some((f) => f.step === "siret_manual"));
 });
 

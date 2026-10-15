@@ -10,10 +10,10 @@ import "./app.css";
 
 /**
  * Parcours « Testeurs fondateurs » RelaisArti, sans compte :
- * /testeurs : présentation → infos ; /testeurs/moi/<jeton> : essai → SIRET → lien de parrainage.
+ * /testeurs : présentation → infos ; /testeurs/moi/<jeton> : essai → questions → lien de parrainage.
  */
 
-const STEPS = ["Infos", "Essai", "Questions", "SIRET", "Partage"];
+const STEPS = ["Infos", "Essai", "Questions", "Partage"];
 
 /** Barre d'avancement : pourcentage + étapes, avec un mot d'encouragement. */
 function Progress({ current }: { current: number }) {
@@ -192,13 +192,14 @@ function InfoStep({ referral, prospect, prefill, onBack }: {
   );
 }
 
-// ---------------------------------------------------------------- Espace personnel : essai → SIRET → partage
+// ---------------------------------------------------------------- Espace personnel : essai → questions → partage
 
 export function TesterSpace() {
   const { token = "" } = useParams();
+  const navigate = useNavigate();
   const [state, setState] = useState<TesterState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | null>(null);
+  const [step, setStep] = useState<1 | 2 | 3 | null>(null);
   const [deleted, setDeleted] = useState(false);
 
   const reload = () =>
@@ -211,8 +212,16 @@ export function TesterSpace() {
     document.title = "Mon espace testeur – RelaisArti";
     savedToken.set(token);
     reload()
-      .then((s) => setStep(s.referralCode || s.completed ? 4 : s.surveyDone ? 3 : s.testCompleted ? 2 : 1))
-      .catch((e) => setError(e instanceof TesterError ? e.message : "Page indisponible."));
+      .then((s) => setStep(s.completed || s.surveyDone ? 3 : s.testCompleted ? 2 : 1))
+      .catch((e) => {
+        // Inscription supprimée (ou lien périmé) : on oublie ce lien sur ce téléphone et on repart de l'accueil.
+        if (e instanceof TesterError && e.status === 404) {
+          savedToken.clear();
+          navigate("/testeurs", { replace: true });
+          return;
+        }
+        setError(e instanceof TesterError ? e.message : "Page indisponible.");
+      });
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (deleted) {
@@ -233,8 +242,7 @@ export function TesterSpace() {
       <Progress current={step} />
       {step === 1 && <TestStep token={token} state={state} onNext={() => reload().then(() => setStep(2))} />}
       {step === 2 && <SurveyStep token={token} state={state} onNext={() => reload().then(() => setStep(3))} />}
-      {step === 3 && <SiretStep token={token} state={state} onNext={() => reload().then(() => setStep(4))} />}
-      {step === 4 && <ShareStep token={token} state={state} onAddSiret={() => setStep(3)} />}
+      {step === 3 && <ShareStep token={token} state={state} />}
       <DeleteData token={token} onDeleted={() => setDeleted(true)} />
       <ContactLine />
     </main>
@@ -382,102 +390,15 @@ function SurveyStep({ token, state, onNext }: { token: string; state: TesterStat
   );
 }
 
-function SiretStep({ token, state, onNext }: { token: string; state: TesterState; onNext: () => void }) {
-  const [siret, setSiret] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [needsProof, setNeedsProof] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-
-  if (state.siretStatus === "verified" || state.siretStatus === "pending_manual") {
-    return (
-      <div className="stack">
-        <h1>SIRET {state.siretStatus === "verified" ? "vérifié" : "en cours de vérification"}</h1>
-        <p className="lead">{state.siretStatus === "verified" ? state.companyName : "Nous vérifions votre devis sous 48 h."}</p>
-        <button className="btn-primary cta" onClick={onNext}>Suivant</button>
-      </div>
-    );
-  }
-
-  async function verify(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await testerApi.verifySiret(token, siret);
-      onNext();
-    } catch (err) {
-      if (err instanceof TesterError && err.code === "not_found") setNeedsProof(true);
-      setError(err instanceof TesterError ? err.message : "Vérification impossible.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function sendProof() {
-    if (!file) return setError("Choisissez une photo ou un PDF.");
-    setBusy(true);
-    setError(null);
-    try {
-      await testerApi.sendProof(token, siret, file);
-      onNext();
-    } catch (err) {
-      setError(err instanceof TesterError ? err.message : "Envoi impossible.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="stack">
-      <h1>Gagnez des avantages en invitant vos confrères</h1>
-      <p className="lead">Plus vous faites inscrire de confrères du bâtiment, plus vous gagnez :</p>
-      <RewardsTrack />
-      <h2 className="siret-title">Votre SIRET</h2>
-      <p className="muted">Il prouve que vous êtes un vrai artisan du bâtiment. Il est nécessaire pour obtenir votre lien de parrainage.</p>
-      <form className="stack" onSubmit={verify}>
-        <label className="field">
-          <span className="label">SIRET (14 chiffres)</span>
-          <input type="text" inputMode="numeric" maxLength={17} value={siret} onChange={(e) => setSiret(e.target.value.replace(/[^\d ]/g, ""))} placeholder="123 456 789 00012" />
-          <span className="hint">Il figure sur vos devis et factures. Avec ou sans espaces.</span>
-        </label>
-        <button className={needsProof ? "btn-secondary" : "btn-primary cta"} disabled={busy || siret.replace(/\s/g, "").length !== 14}>
-          {busy ? "Vérification…" : needsProof ? "Vérifier à nouveau" : "Vérifier"}
-        </button>
-      </form>
-      {error && <p className="error">{error}</p>}
-      {needsProof && (
-        <div className="stack proof">
-          <p className="muted small">Pas d'inquiétude : certains micro-entrepreneurs n'apparaissent pas dans la base publique. Envoyez-nous une photo, nous vérifions sous 48 h.</p>
-          <label className="field">
-            <span className="label">Photo d'un devis ou d'une facture à votre nom</span>
-            <input type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          </label>
-          <button className="btn-primary cta" disabled={busy || !file} onClick={sendProof}>{busy ? "Envoi…" : "Envoyer pour vérification"}</button>
-        </div>
-      )}
-      <button className="btn-ghost" onClick={() => { void testerApi.skipSiret(token); onNext(); }}>Plus tard (pas de lien de parrainage)</button>
-    </div>
-  );
-}
-
-function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterState; onAddSiret: () => void }) {
+function ShareStep({ token, state }: { token: string; state: TesterState }) {
   const [copied, setCopied] = useState<"message" | "lien" | null>(null);
 
   useEffect(() => {
     if (!state.completed) void testerApi.complete(token);
   }, [token, state.completed]);
 
-  if (!state.referralCode) {
-    return (
-      <div className="stack">
-        <h1>Merci {state.firstName}, vous êtes inscrit</h1>
-        <p className="lead">Vous serez parmi les premiers prévenus à l'ouverture. Un SMS de confirmation de RelaisArti vous est envoyé.</p>
-        <p>Ajoutez votre SIRET pour obtenir votre lien de parrainage et gagner des avantages en invitant vos confrères.</p>
-        <button className="btn-primary cta" onClick={onAddSiret}>Ajouter mon SIRET</button>
-      </div>
-    );
-  }
+  if (!state.referralCode) return <p className="muted">Chargement…</p>;
+
 
   const link = `${window.location.origin}/testeurs?parrain=${state.referralCode}`;
   const message = `Salut, je teste RelaisArti. Teste en 3 min, avec mon lien t'as ${INVITEE_REWARD} : ${link}`;
@@ -545,8 +466,6 @@ function ShareStep({ token, state, onAddSiret }: { token: string; state: TesterS
         <button className="btn-secondary" onClick={() => copy("lien")}>{copied === "lien" ? "Lien copié" : "Copier le lien"}</button>
       </div>
       <div className="share-link"><code>{link}</code></div>
-
-      {state.siretStatus === "pending_manual" && <p className="muted small">Votre SIRET est en cours de vérification : vos parrainages comptent dès maintenant.</p>}
       <p className="muted small">Votre lien vous a aussi été envoyé par SMS par RelaisArti. Revenez sur cette page depuis ce téléphone pour suivre vos parrainages.</p>
       <Conditions />
     </div>
@@ -604,7 +523,7 @@ function Conditions() {
       <summary>Conditions du programme</summary>
       <ul className="conditions">
         <li>Le programme est gratuit et sans engagement. Aucun paiement n'est demandé pendant la phase de test.</li>
-        <li>Un parrainage compte quand le confrère invité s'inscrit avec votre lien <strong>et</strong> va au bout de son inscription, essai compris (il reçoit le SMS d'essai sur son portable, ce qui garantit un vrai numéro). Le SIRET du confrère n'est pas obligatoire. Un seul compte par numéro de portable ; pas de parrainage de son propre compte.</li>
+        <li>Un parrainage compte quand le confrère invité s'inscrit avec votre lien <strong>et</strong> va au bout de son inscription, essai compris (il reçoit le SMS d'essai sur son portable, ce qui garantit un vrai numéro). Un seul compte par numéro de portable ; pas de parrainage de son propre compte.</li>
         <li>Les avantages s'appliquent à l'ouverture commerciale du service (abonnement à {PRICE} € HT/mois), sur le compte du parrain et de l'invité. Ils ne sont ni cumulables avec une autre offre, ni échangeables contre de l'argent. Maximum : 6 mois offerts.</li>
         <li>Le tarif fondateur ({FOUNDER_PRICE} € HT/mois au lieu de {PRICE} €) s'applique pendant 6 mois à partir de la souscription.</li>
         <li>Si le service n'ouvre pas commercialement, aucun avantage n'est dû et aucun paiement n'aura été demandé. Vous pouvez supprimer vos données à tout moment depuis votre espace testeur.</li>
@@ -612,8 +531,8 @@ function Conditions() {
       </ul>
       <p className="small conditions-title">Vos données</p>
       <ul className="conditions">
-        <li><strong>Ce que nous collectons</strong> : nom de l'entreprise, prénom, nom, portable, métier et code postal (facultatifs), SIRET et, si besoin, la photo d'un devis ; la demande que vous remplissez pendant l'essai.</li>
-        <li><strong>Pourquoi</strong> : faire fonctionner l'essai, vérifier que vous êtes artisan du bâtiment, compter vos parrainages, et vous prévenir de l'ouverture. Aucune revente, aucune publicité de tiers.</li>
+        <li><strong>Ce que nous collectons</strong> : prénom, nom de l'entreprise, portable, vos réponses aux questions et la demande que vous remplissez pendant l'essai.</li>
+        <li><strong>Pourquoi</strong> : faire fonctionner l'essai, compter vos parrainages, et vous prévenir de l'ouverture. Aucune revente, aucune publicité de tiers.</li>
         <li><strong>Combien de temps</strong> : pendant le programme de test, puis 12 mois après l'ouverture si vous ne devenez pas client.</li>
         <li><strong>Vos droits</strong> : vous pouvez supprimer toutes vos données à tout moment avec le bouton « Supprimer mes données » de votre espace testeur, ou demander l'accès, la correction ou la suppression par email à {CONTACT_EMAIL}.</li>
       </ul>

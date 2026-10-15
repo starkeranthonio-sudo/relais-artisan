@@ -157,7 +157,8 @@ export interface TesterState {
 export async function getState(token: string, deps: ProgramDeps): Promise<Result<TesterState>> {
   const t = await deps.store.findByToken(token);
   if (!t) return fail(404, "Lien invalide.");
-  const canRefer = t.siret_status === "verified" || t.siret_status === "pending_manual";
+  // Plus d'étape SIRET : le lien de parrainage est donné dès les questions terminées (essai fait avant).
+  const canRefer = t.survey_completed_at !== null || t.completed_at !== null;
   return {
     ok: true,
     value: {
@@ -232,8 +233,7 @@ export async function complete(token: string, sessionId: unknown, deps: ProgramD
   if (!t.completed_at) {
     await deps.store.markCompleted(t.id, (deps.now ?? (() => new Date()))());
     await deps.store.logFunnel(t.id, "completed", sessionOf(sessionId));
-    const canRefer = t.siret_status === "verified" || t.siret_status === "pending_manual";
-    await sendQuietly(deps, t.artisan.owner_phone, thankYouSms(t.first_name, canRefer ? referralLink(deps.appUrl, t.referral_code) : null));
+    await sendQuietly(deps, t.artisan.owner_phone, thankYouSms(t.first_name, referralLink(deps.appUrl, t.referral_code)));
     await notifySponsor(t, deps);
   }
   return { ok: true, value: null };
