@@ -261,6 +261,9 @@ function ProspectRow({ p, progress, templates, onChange, onRemove }: {
         {!blocked && <button className="btn-ghost small" onClick={() => status("pas_interesse")}>Pas intéressé</button>}
         {p.status !== "stop" && <button className="btn-ghost small" onClick={() => status("stop")}>A répondu STOP</button>}
         {blocked && <button className="btn-ghost small" onClick={() => status(p.contact_count > 0 ? "contacte" : "nouveau")}>Annuler</button>}
+        {p.contact_count > 0 && p.last_channel !== "appel" && (
+          <button className="btn-ghost small" onClick={() => prospectApi.undoContact(p).then(onChange, () => setError("Annulation impossible."))}>Pas envoyé</button>
+        )}
         <button className="btn-ghost small" onClick={remove}>Supprimer</button>
       </div>
       {error && <p className="error small">{error}</p>}

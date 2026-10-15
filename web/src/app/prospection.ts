@@ -180,6 +180,17 @@ export const prospectApi = {
     };
     return check(await supabase.from("prospects").update(patch).eq("id", p.id).select(COLUMNS).single());
   },
+  /** Le message n'est finalement pas parti (iMessage, erreur d'envoi) : on annule le dernier contact noté. */
+  async undoContact(p: Prospect): Promise<Prospect> {
+    const count = Math.max(0, p.contact_count - 1);
+    const patch = {
+      contact_count: count,
+      last_contacted_at: count === 0 ? null : p.last_contacted_at,
+      last_channel: count === 0 ? null : p.last_channel,
+      status: count === 0 && p.status === "contacte" ? "nouveau" : p.status,
+    };
+    return check(await supabase.from("prospects").update(patch).eq("id", p.id).select(COLUMNS).single());
+  },
   async setStatus(p: Prospect, status: ProspectStatus): Promise<Prospect> {
     return check(await supabase.from("prospects").update({ status }).eq("id", p.id).select(COLUMNS).single());
   },
