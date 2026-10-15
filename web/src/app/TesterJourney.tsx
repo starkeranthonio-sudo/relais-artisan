@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase.ts";
 import { toE164 } from "./format.ts";
 import { currentTier, FOUNDER_PRICE, INVITEE_REWARD, nextTier, PRICE } from "./founders.ts";
 import { RewardsTrack } from "./RewardsTrack.tsx";
+import { TradesHero } from "./TradesHero.tsx";
 import { CONTACT_EMAIL, FREE_TEXT_QUESTION, SURVEY_QUESTIONS } from "./survey.ts";
 import { logStep, savedToken, TesterError, testerApi, type TesterState } from "./testerApi.ts";
 import "./app.css";
@@ -96,17 +97,18 @@ export function TesterLanding() {
       <p className="eyebrow">{prefill?.first_name ? `Bonjour ${prefill.first_name}` : "RelaisArti"}</p>
       {step === "intro" ? (
         <>
-          <h1>Ne perdez plus un client à cause d'un appel manqué</h1>
+          <TradesHero />
+          <h1 className="hero-title">Ne perdez plus un client à cause d'un appel manqué</h1>
           {ref && <p className="invite">Un confrère vous invite : <strong>{INVITEE_REWARD}</strong> à l'ouverture.</p>}
           <ul className="benefits">
             {BENEFITS.map((b) => <li key={b}>{b}</li>)}
           </ul>
+          <button className="btn-primary cta" onClick={start}>Tester en 1 minute</button>
+          <Reassurance />
           <div className="try-box">
             <strong>L'essai : 1 minute sur votre téléphone</strong>
             <span>Vous recevez le SMS que recevrait votre client et vous voyez la demande arriver, comme si vous aviez raté son appel.</span>
           </div>
-          <button className="btn-primary cta" onClick={start}>Tester en 1 minute</button>
-          <Reassurance />
           <Conditions />
         </>
       ) : (
