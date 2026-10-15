@@ -372,3 +372,12 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   .hero-chip-missed { animation: none; opacity: 0; }
   .hero-chip-saved { animation: none; opacity: 1; }
 }
+
+/* Avertissement rouge : revenir sur la page après l'essai */
+.come-back {
+  display: flex; gap: 12px; align-items: flex-start; color: var(--danger);
+  background: var(--danger-tint); border: 2px solid var(--danger); border-radius: var(--radius-md); padding: 14px 16px;
+}
+.come-back svg { flex: 0 0 28px; width: 28px; height: 28px; margin-top: 1px; }
+.come-back p { margin: 0; color: var(--danger); font-size: 0.9375rem; }
+.come-back strong { color: var(--danger); }

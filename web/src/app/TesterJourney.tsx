@@ -307,6 +307,8 @@ function TestStep({ token, state, onNext }: { token: string; state: TesterState;
         </p>
       </div>
 
+      <ComeBackWarning />
+
       {!sent ? (
         <button className="btn-primary cta" onClick={send} disabled={busy}>{busy ? "Envoi…" : "Recevoir l'essai sur mon portable"}</button>
       ) : (
@@ -320,6 +322,23 @@ function TestStep({ token, state, onNext }: { token: string; state: TesterState;
         </>
       )}
       {error && <p className="error">{error}</p>}
+    </div>
+  );
+}
+
+/** Avertissement : après l'essai (dans les SMS), il faut revenir sur cette page pour finir l'inscription. */
+function ComeBackWarning() {
+  return (
+    <div className="come-back" role="alert">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3.5 22 20.5H2L12 3.5Z" fill="currentColor" />
+        <path d="M12 10v4.5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+        <circle cx="12" cy="17.4" r="1.25" fill="#fff" />
+      </svg>
+      <p>
+        <strong>Après avoir rempli la demande reçue par SMS, revenez sur cette page</strong> pour terminer votre inscription.
+        Sans ça, elle n'est pas validée.
+      </p>
     </div>
   );
 }
