@@ -1,7 +1,8 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { supabase } from "../lib/supabase.ts";
 import { toE164 } from "./format.ts";
-import { currentTier, FOUNDER_PRICE, INVITEE_REWARD, nextTier, PRICE, TRADES } from "./founders.ts";
+import { currentTier, FOUNDER_PRICE, INVITEE_REWARD, nextTier, PRICE } from "./founders.ts";
 import { RewardsTrack } from "./RewardsTrack.tsx";
 import { CONTACT_EMAIL, FREE_TEXT_QUESTION, SURVEY_QUESTIONS } from "./survey.ts";
 import { logStep, savedToken, TesterError, testerApi, type TesterState } from "./testerApi.ts";
@@ -39,19 +40,36 @@ function Progress({ current }: { current: number }) {
   );
 }
 
-const FEATURES: [string, string][] = [
-  ["Appel manqué = SMS immédiat", "Quand vous ne pouvez pas décrocher, votre client reçoit en quelques secondes un SMS à votre nom pour décrire son besoin."],
-  ["La demande résumée par SMS", "Travaux, adresse, urgence, photos : vous recevez un résumé clair, prêt à rappeler."],
-  ["Vos devis relancés tout seuls", "À J+3, J+7 et J+14, jusqu'à ce que le client réponde. Vous signez plus de chantiers."],
-  ["Votre bilan du mois", "Appels récupérés, devis gagnés, montant signé : vous voyez ce que l'outil vous rapporte."],
-  ["Entre confrères", "Pas votre métier ? Transmettez le chantier à un confrère. Chantier fini ? Demandez un avis Google en un clic."],
+const BENEFITS = [
+  "Le client qui tombe sur votre répondeur est pris en charge en quelques secondes, à votre nom.",
+  "Vous recevez sa demande résumée : travaux, adresse, urgence, photos. Prêt à rappeler.",
+  "Vos devis sont relancés tout seuls, jusqu'à ce que le client réponde.",
 ];
+
+/** Rassurance affichée juste sous le bouton (gratuité, absence d'engagement, rien à installer). */
+function Reassurance() {
+  return <p className="reassure">Gratuit · Sans engagement · Sans carte bancaire · Sans changer de numéro</p>;
+}
+
+/** Prénom et entreprise d'un artisan arrivé par son lien de prospection, pour l'accueillir et pré-remplir le formulaire. */
+function useProspectPrefill(code: string | null) {
+  const [prefill, setPrefill] = useState<{ first_name: string | null; business_name: string } | null>(null);
+  useEffect(() => {
+    if (!code || !/^[a-z0-9]{6,10}$/i.test(code)) return;
+    supabase.rpc("prospect_prefill", { p_code: code }).then(({ data }) => {
+      const row = (data as { first_name: string | null; business_name: string }[] | null)?.[0];
+      if (row) setPrefill(row);
+    });
+  }, [code]);
+  return prefill;
+}
 
 export function TesterLanding() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const ref = params.get("parrain");
   const prospect = params.get("p");
+  const prefill = useProspectPrefill(prospect);
   const [step, setStep] = useState<"intro" | "info">("intro");
 
   useEffect(() => {
@@ -67,48 +85,61 @@ export function TesterLanding() {
     return () => clearTimeout(timer);
   }, [ref, prospect, navigate]);
 
+  const start = () => {
+    logStep("intro_next", ref, prospect ? { prospect: prospect.slice(0, 10).toLowerCase() } : {});
+    setStep("info");
+    window.scrollTo(0, 0);
+  };
+
   return (
     <main className="founders">
-      <p className="eyebrow">RelaisArti · Testeurs fondateurs</p>
+      <p className="eyebrow">{prefill?.first_name ? `Bonjour ${prefill.first_name}` : "RelaisArti"}</p>
       {step === "intro" ? (
         <>
           <h1>Ne perdez plus un client à cause d'un appel manqué</h1>
-          <p className="lead">L'outil des artisans du bâtiment qui n'ont pas le temps de décrocher sur un chantier.</p>
           {ref && <p className="invite">Un confrère vous invite : <strong>{INVITEE_REWARD}</strong> à l'ouverture.</p>}
-          <ul className="features">
-            {FEATURES.map(([title, text]) => (
-              <li key={title}><strong>{title}</strong><span>{text}</span></li>
-            ))}
+          <ul className="benefits">
+            {BENEFITS.map((b) => <li key={b}>{b}</li>)}
           </ul>
-          <p className="muted small">Sans changer de numéro, sans application à installer. {PRICE} € HT/mois à l'ouverture, sans engagement.</p>
-          <button className="btn-primary cta" onClick={() => { logStep("intro_next", ref); setStep("info"); }}>
-            Devenir testeur fondateur
-          </button>
-          <p className="muted small center-text">Gratuit pendant la phase de test. <Link to="/demo">Voir une démonstration</Link></p>
+          <div className="try-box">
+            <strong>L'essai : 1 minute sur votre téléphone</strong>
+            <span>Vous recevez le SMS que recevrait votre client et vous voyez la demande arriver, comme si vous aviez raté son appel.</span>
+          </div>
+          <button className="btn-primary cta" onClick={start}>Tester en 1 minute</button>
+          <Reassurance />
           <Conditions />
         </>
       ) : (
-        <InfoStep referral={ref} prospect={prospect} onBack={() => setStep("intro")} />
+        <InfoStep referral={ref} prospect={prospect} prefill={prefill} onBack={() => setStep("intro")} />
       )}
       <ContactLine />
     </main>
   );
 }
 
-function InfoStep({ referral, prospect, onBack }: { referral: string | null; prospect: string | null; onBack: () => void }) {
+function InfoStep({ referral, prospect, prefill, onBack }: {
+  referral: string | null; prospect: string | null; prefill: { first_name: string | null; business_name: string } | null; onBack: () => void;
+}) {
   const navigate = useNavigate();
-  const [f, setF] = useState({ businessName: "", firstName: "", lastName: "", phone: "", trade: "", postalCode: "" });
-  const [error, setError] = useState<string | null>(null);
+  const [f, setF] = useState({ firstName: prefill?.first_name ?? "", businessName: prefill?.business_name ?? "", phone: "" });
+  const [error, setError] = useState<{ field: keyof typeof f; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [existing, setExisting] = useState(false);
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  // Pré-remplissage arrivé après l'ouverture du formulaire : on complète seulement les champs encore vides.
+  useEffect(() => {
+    if (prefill) setF((cur) => ({ ...cur, firstName: cur.firstName || prefill.first_name || "", businessName: cur.businessName || prefill.business_name }));
+  }, [prefill]);
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => {
+    setF({ ...f, [k]: e.target.value });
+    if (error?.field === k) setError(null);
+  };
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (f.businessName.trim().length < 2) return setError("Indiquez le nom de votre entreprise.");
-    if (!f.firstName.trim() || !f.lastName.trim()) return setError("Indiquez votre prénom et votre nom.");
-    if (!toE164(f.phone) || !/^\+33[67]/.test(toE164(f.phone)!)) return setError("Numéro de portable invalide (ex. : 06 12 34 56 78). Il sert à l'essai.");
-    if (f.postalCode && !/^\d{5}$/.test(f.postalCode)) return setError("Code postal : 5 chiffres.");
+    if (!f.firstName.trim()) return setError({ field: "firstName", text: "Indiquez votre prénom." });
+    if (f.businessName.trim().length < 2) return setError({ field: "businessName", text: "Indiquez le nom de votre entreprise." });
+    const phone = toE164(f.phone);
+    if (!phone || !/^\+33[67]/.test(phone)) return setError({ field: "phone", text: "Un numéro de portable en 06 ou 07, par exemple 06 12 34 56 78." });
     setBusy(true);
     setError(null);
     try {
@@ -118,7 +149,7 @@ function InfoStep({ referral, prospect, onBack }: { referral: string | null; pro
         navigate(`/testeurs/moi/${r.token}`);
       } else setExisting(true);
     } catch (err) {
-      setError(err instanceof TesterError ? err.message : "Inscription impossible. Vérifiez votre connexion.");
+      setError({ field: "phone", text: err instanceof TesterError ? err.message : "Inscription impossible. Vérifiez votre connexion." });
     } finally {
       setBusy(false);
     }
@@ -133,47 +164,30 @@ function InfoStep({ referral, prospect, onBack }: { referral: string | null; pro
     );
   }
 
+  const fieldError = (k: keyof typeof f) => error?.field === k && <span className="field-error" role="alert">{error.text}</span>;
   return (
     <form className="stack" onSubmit={submit} noValidate>
       <Progress current={0} />
-      <h1>Vos informations</h1>
+      <h1>Où vous envoie-t-on l'essai ?</h1>
+      <p className="lead">Un SMS arrive dans quelques secondes sur votre portable : c'est l'essai.</p>
+      <label className="field">
+        <span className="label">Prénom</span>
+        <input type="text" autoComplete="given-name" value={f.firstName} onChange={set("firstName")} aria-invalid={error?.field === "firstName"} />
+        {fieldError("firstName")}
+      </label>
       <label className="field">
         <span className="label">Nom de l'entreprise</span>
-        <input type="text" autoComplete="organization" value={f.businessName} onChange={set("businessName")} placeholder="Ex. : Dupont Plomberie" />
+        <input type="text" autoComplete="organization" value={f.businessName} onChange={set("businessName")} placeholder="Ex. : Dupont Plomberie" aria-invalid={error?.field === "businessName"} />
+        {fieldError("businessName")}
       </label>
-      <div className="field-row half">
-        <label className="field">
-          <span className="label">Prénom</span>
-          <input type="text" autoComplete="given-name" value={f.firstName} onChange={set("firstName")} />
-        </label>
-        <label className="field">
-          <span className="label">Nom</span>
-          <input type="text" autoComplete="family-name" value={f.lastName} onChange={set("lastName")} />
-        </label>
-      </div>
       <label className="field">
         <span className="label">Votre portable</span>
-        <input type="tel" inputMode="tel" autoComplete="tel" value={f.phone} onChange={set("phone")} placeholder="06 12 34 56 78" />
-        <span className="hint">Indispensable : c'est sur ce numéro que vous vivrez l'essai.</span>
+        <input type="tel" inputMode="tel" autoComplete="tel" value={f.phone} onChange={set("phone")} placeholder="06 12 34 56 78" aria-invalid={error?.field === "phone"} />
+        {fieldError("phone")}
       </label>
-      <div className="field-row">
-        <label className="field">
-          <span className="label">Métier</span>
-          <select value={f.trade} onChange={set("trade")}>
-            <option value="">Choisir…</option>
-            {TRADES.map((t) => <option key={t}>{t}</option>)}
-          </select>
-        </label>
-        <label className="field">
-          <span className="label">Code postal</span>
-          <input type="text" inputMode="numeric" maxLength={5} value={f.postalCode} onChange={(e) => setF({ ...f, postalCode: e.target.value.replace(/\D/g, "") })} />
-        </label>
-      </div>
-      <p className="hint tight">Métier et code postal : facultatifs, ils nous aident à vous proposer des confrères proches.</p>
-      {error && <p className="error" role="alert">{error}</p>}
-      <button className="btn-primary cta" disabled={busy}>{busy ? "Inscription…" : "Suivant"}</button>
+      <button className="btn-primary cta" disabled={busy}>{busy ? "Envoi…" : "Recevoir l'essai par SMS"}</button>
+      <p className="reassure">Votre numéro sert uniquement à l'essai. Aucune publicité, suppression à tout moment.</p>
       <button type="button" className="btn-ghost" onClick={onBack}>Retour</button>
-      <p className="muted small">Vos informations servent uniquement au programme de test RelaisArti et à vous prévenir de l'ouverture. Vous pourrez les supprimer à tout moment depuis votre espace testeur.</p>
     </form>
   );
 }

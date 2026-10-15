@@ -147,7 +147,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .btn-social {
   display: flex; align-items: center; justify-content: center; gap: 10px;
   font: inherit; font-weight: 600; font-size: 1rem; cursor: pointer;
-  background: #ffffff; color: #1f1f1f; border: 1px solid #ffffff; border-radius: var(--radius-sm); padding: 12px 16px;
+  background: #ffffff; color: #1f1f1f; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 12px 16px;
 }
 .btn-social svg { width: 20px; height: 20px; }
 .divider { display: flex; align-items: center; gap: 12px; color: var(--text-dim); font-size: 0.8125rem; margin: 8px 0 -6px; }
@@ -233,7 +233,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 
 .delete-box { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 12px; text-align: center; }
 .btn-ghost.small { font-size: 0.875rem; color: var(--text-dim); }
-.btn-danger { font: inherit; font-weight: 700; border: 0; border-radius: var(--radius-sm); padding: 13px 16px; cursor: pointer; background: var(--danger); color: #1c1d1f; }
+.btn-danger { font: inherit; font-weight: 700; border: 0; border-radius: var(--radius-sm); padding: 13px 16px; cursor: pointer; background: var(--danger); color: #fff; }
 .conditions-title { font-weight: 700; margin-top: 14px; color: var(--text-sec); }
 
 /* Barre d'avancement + questions */
@@ -307,3 +307,16 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .prospect .message-preview { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .prospection .tabs-inline { overflow-x: auto; }
 .prospection .tabs-inline button { white-space: nowrap; }
+
+/* Parcours testeur : présentation courte, rassurance, erreurs au bon champ */
+.benefits { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.benefits li { position: relative; padding-left: 28px; color: var(--text); }
+.benefits li::before {
+  content: ""; position: absolute; left: 0; top: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent-tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%23047857' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat;
+}
+.try-box { display: flex; flex-direction: column; gap: 4px; background: var(--subtle); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px 16px; }
+.try-box span { color: var(--text-sec); font-size: 0.9375rem; }
+.reassure { color: var(--text-sec); font-size: 0.8125rem; text-align: center; margin: 0; }
+.field-error { display: block; color: var(--danger); font-size: 0.875rem; font-weight: 600; margin-top: 6px; }
+.field input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-tint); }

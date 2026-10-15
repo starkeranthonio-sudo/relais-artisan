@@ -265,3 +265,11 @@ Deno.test("prospection : le code du lien est rattaché au testeur, un code inval
   assertEquals(prospects.get("t1"), "ab3kx9q");
   assertEquals(prospects.get("t2"), null);
 });
+
+Deno.test("inscription : le nom de famille, le métier et le code postal sont facultatifs", async () => {
+  const { deps } = setup();
+  const r = await register({ businessName: "Dupont Plomberie", firstName: "Jean", phone: "06 12 34 56 78" }, deps);
+  assert(r.ok);
+  const missingFirst = await register({ businessName: "Dupont Plomberie", firstName: " ", phone: "06 11 11 11 11" }, deps);
+  assertEquals(missingFirst.ok, false);
+});

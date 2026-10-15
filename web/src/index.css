@@ -7,28 +7,28 @@
  *  - Pas d'emoji, pas de dégradé, pas d'effet de verre.
  */
 :root {
-  --bg: #1c1d1f;
-  --subtle: #25272a;
-  --field: #232528;
-  --text: #f4f3f0;
-  --text-sec: #b3b0aa;
-  --text-dim: #7f7c77;
-  --line: #34363a;
-  --line-strong: #46494e;
+  --bg: #ffffff;
+  --subtle: #f4f6f5;
+  --field: #ffffff;
+  --text: #14191a;
+  --text-sec: #4a5455;
+  --text-dim: #6b7475;
+  --line: #e3e7e6;
+  --line-strong: #c9d0ce;
 
-  --accent: #ff6a13;         /* orange vif */
-  --accent-press: #ff8a45;
-  --accent-text: #ff8a45;    /* accent pour du texte sur fond foncé */
-  --accent-tint: rgba(255, 106, 19, 0.14);
-  --on-accent: #17130f;
+  --accent: #059669;         /* vert émeraude */
+  --accent-press: #047857;
+  --accent-text: #047857;    /* accent pour du texte sur fond blanc (contraste AA) */
+  --accent-tint: rgba(5, 150, 105, 0.1);
+  --on-accent: #ffffff;
 
-  --danger: #ff6b6b;
-  --danger-tint: rgba(255, 107, 107, 0.12);
-  --success: #4ade80;
+  --danger: #c62828;
+  --danger-tint: rgba(198, 40, 40, 0.08);
+  --success: #047857;
 
   --radius-sm: 10px;
   --radius-md: 14px;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 :root[data-accent="jaune"] {
@@ -127,7 +127,7 @@ input[type="text"]:focus, textarea:focus {
   list-style: none; margin: 0; padding: 6px;
   background: var(--subtle);
   border: 1px solid var(--line-strong); border-radius: var(--radius-md);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 16px 40px rgba(20, 25, 26, 0.12);
 }
 .suggestions li {
   display: flex; flex-direction: column; gap: 1px;

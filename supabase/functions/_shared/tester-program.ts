@@ -96,7 +96,7 @@ export function referralLinkSms(firstName: string, link: string): string {
 export interface RegisterInput {
   businessName: unknown;
   firstName: unknown;
-  lastName: unknown;
+  lastName?: unknown;
   phone: unknown;
   trade?: unknown;
   postalCode?: unknown;
@@ -113,7 +113,7 @@ export async function register(input: RegisterInput, deps: ProgramDeps): Promise
   const phone = toE164(clean(input.phone, 20));
   const postalCode = clean(input.postalCode, 5);
   if (businessName.length < 2) return fail(400, "Indiquez le nom de votre entreprise.");
-  if (firstName.length < 1 || lastName.length < 1) return fail(400, "Indiquez votre prénom et votre nom.");
+  if (firstName.length < 1) return fail(400, "Indiquez votre prénom."); // nom de famille facultatif : formulaire le plus court possible
   if (!/^\+33[67]\d{8}$/.test(phone)) return fail(400, "Numéro de portable invalide (ex. : 06 12 34 56 78).");
   if (postalCode && !/^\d{5}$/.test(postalCode)) return fail(400, "Code postal : 5 chiffres.");
 
