@@ -53,16 +53,17 @@ export const prospectLink = (code: string) => `${window.location.origin}/testeur
 // Dépannage (plomberie, électricité, chauffage : 150 à 450 € l'intervention) : 5 × 200 € = 1 000 €/mois.
 // Métiers à devis : 5 appels manqués ≈ au moins 1 chantier perdu (peinture ≈ 1 200 € la pièce, carrelage ≈ 1 500 € la salle de bain).
 const REPAIR_TRADES = ["Plombier", "Chauffagiste", "Électricien", "Serrurier", "Climaticien", "Multiservice"];
-const QUOTE_JOB: Record<string, number> = { Peintre: 1200, Carreleur: 1500 };
+// Couverture : réparation 50 à 3 500 € (bas-milieu de fourchette ≈ 800 €). Autres métiers à devis : ≈ 1 000 € par prudence.
+const QUOTE_JOB: Record<string, number> = { Peintre: 1200, Carreleur: 1500, Couvreur: 800 };
+const DEFAULT_QUOTE_JOB = 1000;
 const euros = (n: number) => `${n.toLocaleString("fr-FR").replace(/\s/g, " ")} €`;
 
 function lossFor(trade: string | null): string {
   if (trade && REPAIR_TRADES.includes(trade)) {
     return ` 5 appels manqués par mois, c'est environ ${euros(1000)} de dépannages qui partent chez un concurrent : ${euros(12000)} par an.`;
   }
-  const job = trade ? QUOTE_JOB[trade] : undefined;
-  if (job) return ` 5 appels manqués par mois, c'est au moins un chantier, environ ${euros(job)} qui partent chez un concurrent : ${euros(job * 12)} par an.`;
-  return ""; // couvreur, menuisier, maçon… : pas de chiffre fiable, on n'en invente pas
+  const job = (trade && QUOTE_JOB[trade]) || DEFAULT_QUOTE_JOB;
+  return ` 5 appels manqués par mois, c'est au moins un chantier, environ ${euros(job)} qui partent chez un concurrent : ${euros(job * 12)} par an.`;
 }
 
 /** « Bonjour Micael » ou, sans prénom connu, « Bonjour l'équipe de Durand Plomberie » (« d'… » devant une voyelle). */
