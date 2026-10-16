@@ -41,10 +41,12 @@ export const SOURCES: { value: ProspectSource; label: string; inText: string }[]
 export const DAILY_LIMIT = 50;
 export const FOLLOW_UP_AFTER_DAYS = 3;
 
-// Le message validé, identique pour le premier envoi et la relance.
-const MESSAGE =
-  "{debut}, chaque appel manqué, c'est un client perdu.{perte} {solution} Ça vous dérangerait de le tester ? 1 min sur votre téléphone : {lien}\nSTOP pour ne plus recevoir";
-export const DEFAULT_TEMPLATES = { first: MESSAGE, followUp: MESSAGE };
+// 1er message et relance : court, humain, sans lien ni montant, une seule question (pour obtenir une réponse).
+const QUESTION =
+  "{bonjour}, je suis Starker, je travaille sur un outil pour les {metiers} qui ratent des appels sur les chantiers. Je peux vous poser une question de 30 secondes sur comment vous gérez ça ? (Si ça ne vous intéresse pas, répondez STOP, vous avez le choix.)";
+// Après sa réponse : le calcul de ce qu'il perd, puis le lien de l'essai.
+const LINK = "{merci} Un appel manqué, c'est {un_appel} perdu. {cinq_par_mois} {solution} Testez-le en 1 min sur votre téléphone : {lien}";
+export const DEFAULT_TEMPLATES = { first: QUESTION, followUp: QUESTION, link: LINK };
 export type Templates = typeof DEFAULT_TEMPLATES;
 
 export const prospectLink = (code: string) => `${window.location.origin}/testeurs?p=${code}`;
@@ -58,12 +60,18 @@ const QUOTE_JOB: Record<string, number> = { Peintre: 1200, Carreleur: 1500, Couv
 const DEFAULT_QUOTE_JOB = 1000;
 const euros = (n: number) => `${n.toLocaleString("fr-FR").replace(/\s/g, " ")} €`;
 
-function lossFor(trade: string | null): string {
-  if (trade && REPAIR_TRADES.includes(trade)) {
-    return ` 5 appels manqués par mois, c'est environ ${euros(1000)} de dépannages qui partent chez un concurrent : ${euros(12000)} par an.`;
+const PLURAL: Record<string, string> = {
+  Plombier: "plombiers", Électricien: "électriciens", Chauffagiste: "chauffagistes", Peintre: "peintres", Carreleur: "carreleurs",
+  Couvreur: "couvreurs", Menuisier: "menuisiers", Maçon: "maçons", Serrurier: "serruriers", Climaticien: "climaticiens",
+};
+
+/** Ce que coûte un appel manqué, puis 5 par mois, sur un an. */
+function loss(trade: string | null): { one: string; five: string } {
+  if (!trade || REPAIR_TRADES.includes(trade)) {
+    return { one: `environ ${euros(200)} de dépannage`, five: `5 par mois, c'est ${euros(1000)}, soit ${euros(12000)} par an qui partent chez un concurrent.` };
   }
-  const job = (trade && QUOTE_JOB[trade]) || DEFAULT_QUOTE_JOB;
-  return ` 5 appels manqués par mois, c'est au moins un chantier, environ ${euros(job)} qui partent chez un concurrent : ${euros(job * 12)} par an.`;
+  const job = QUOTE_JOB[trade] || DEFAULT_QUOTE_JOB;
+  return { one: `parfois un chantier de ${euros(job)}`, five: `5 par mois, c'est au moins un chantier, soit ${euros(job * 12)} par an qui partent chez un concurrent.` };
 }
 
 /** « Bonjour Micael » ou, sans prénom connu, « Bonjour l'équipe de Durand Plomberie » (« d'… » devant une voyelle). */
@@ -76,12 +84,14 @@ export function greeting(p: Pick<Prospect, "first_name" | "business_name">): str
 export function buildMessage(template: string, p: Prospect): string {
   const source = SOURCES.find((s) => s.value === p.source)?.inText ?? "internet";
   const hello = greeting(p);
-  const opening = hello;
   const repair = !p.trade || REPAIR_TRADES.includes(p.trade);
+  const l = loss(p.trade);
   return template
-    .replaceAll("{debut}", opening)
     .replaceAll("{bonjour}", hello)
-    .replaceAll("{perte}", lossFor(p.trade))
+    .replaceAll("{merci}", p.first_name ? `Merci ${p.first_name} !` : "Merci !")
+    .replaceAll("{metiers}", (p.trade && PLURAL[p.trade]) || "artisans")
+    .replaceAll("{un_appel}", l.one)
+    .replaceAll("{cinq_par_mois}", l.five)
     .replaceAll("{solution}", repair
       ? "RelaisArti gère vos appels manqués : le client est pris en charge à votre nom et vous ne perdez pas le contrat."
       : "RelaisArti gère vos appels manqués et relance vos devis : vous ne laissez plus filer de travaux.")
@@ -171,6 +181,11 @@ export const prospectApi = {
       last_channel: channel,
       status: p.status === "nouveau" ? "contacte" : p.status,
     };
+    return check(await supabase.from("prospects").update(patch).eq("id", p.id).select(COLUMNS).single());
+  },
+  /** Lien de l'essai envoyé à un artisan qui a répondu : on note l'envoi sans le compter comme une relance. */
+  async markLinkSent(p: Prospect, channel: Channel): Promise<Prospect> {
+    const patch = { last_contacted_at: new Date().toISOString(), last_channel: channel };
     return check(await supabase.from("prospects").update(patch).eq("id", p.id).select(COLUMNS).single());
   },
   /** Le message n'est finalement pas parti (iMessage, erreur d'envoi) : on annule le dernier contact noté. */

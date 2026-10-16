@@ -197,13 +197,18 @@ function ProspectRow({ p, progress, templates, onChange, onRemove }: {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const followUp = p.contact_count >= 1;
-  const message = buildMessage(followUp ? templates.followUp : templates.first, p);
+  // Il a répondu et il est intéressé : on lui envoie le calcul et le lien de l'essai.
+  const sendLink = p.status === "interesse";
+  const message = buildMessage(sendLink ? templates.link : followUp ? templates.followUp : templates.first, p);
   const mobile = isMobile(p.phone);
   const blocked = p.status === "stop" || p.status === "pas_interesse";
 
   // Le lien ouvre l'appli (Messages, WhatsApp, Téléphone) ; on note le contact au même moment.
   const contacted = (channel: Channel) => {
     prospectApi.markContacted(p, channel).then(onChange, () => setError("Contact non enregistré. Vérifiez votre connexion."));
+  };
+  const linkSent = (channel: Channel) => {
+    prospectApi.markLinkSent(p, channel).then(onChange, () => setError("Envoi non enregistré. Vérifiez votre connexion."));
   };
   const status = (s: ProspectStatus) => {
     prospectApi.setStatus(p, s).then(onChange, () => setError("Statut non enregistré."));
@@ -240,8 +245,10 @@ function ProspectRow({ p, progress, templates, onChange, onRemove }: {
           <div className="prospect-actions">
             {mobile ? (
               <>
-                <a className="btn-primary" href={smsHref(p.phone, message)} onClick={() => contacted("sms")}>{followUp ? "Relancer par SMS" : "SMS"}</a>
-                <a className="btn-secondary" href={whatsappHref(p.phone, message)} target="_blank" rel="noreferrer" onClick={() => contacted("whatsapp")}>WhatsApp</a>
+                <a className="btn-primary" href={smsHref(p.phone, message)} onClick={() => (sendLink ? linkSent("sms") : contacted("sms"))}>
+                  {sendLink ? "Envoyer le lien" : followUp ? "Relancer par SMS" : "SMS"}
+                </a>
+                <a className="btn-secondary" href={whatsappHref(p.phone, message)} target="_blank" rel="noreferrer" onClick={() => (sendLink ? linkSent("whatsapp") : contacted("whatsapp"))}>WhatsApp</a>
               </>
             ) : (
               <p className="muted small">Numéro fixe : pas de SMS possible, appelez.</p>
